@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
-import { IsISO8601, IsString, IsUUID } from 'class-validator';
+import { IsIn, IsUUID } from 'class-validator';
 import {
   GetQueueAttributesCommand,
   GetQueueUrlCommand,
@@ -15,20 +15,12 @@ import { MessageHandlerRegistry } from '@infrastructure/messaging/message-handle
 import { OUTBOX_RELAY_LOCK_KEY } from '@infrastructure/messaging/outbox-relay.service';
 import { TestContext, setupTestApp, teardownTestApp } from '../helpers/test-app.helper';
 
-class StockReservedPayload {
+class RevertApprovalPayload {
   @IsUUID('4')
   quoteId!: string;
-}
 
-class PaymentApprovedPayload {
-  @IsString()
-  paymentId!: string;
-
-  @IsString()
-  amount!: string;
-
-  @IsISO8601()
-  paidAt!: string;
+  @IsIn(['SENT', 'REJECTED'])
+  revertTo!: 'SENT' | 'REJECTED';
 }
 
 async function waitFor(
@@ -46,24 +38,36 @@ async function waitFor(
   }
 }
 
-// Every test publishes on its own work order, so a message stuck in one FIFO group never blocks another test.
+// Every test publishes on its own work order id, so a message stuck in one FIFO group never blocks
+// another test. Only the types the filter policy routes to billing.fifo come back to this service.
 describe('Messaging (E2E)', () => {
   let ctx: TestContext;
   let unitOfWork: IUnitOfWork;
-  let registry: MessageHandlerRegistry;
   let sqs: SQSClient;
   let queueUrl: string;
-  let customerId: string;
-  let vehicleId: string;
-  let workOrderCounter = 0;
+  const received: MessageEnvelope<'billing.quote.revert_approval'>[] = [];
+  const failFirstDelivery = new Set<string>();
 
   beforeAll(async () => {
     ctx = await setupTestApp({ withMessaging: true, captureLogs: true });
     unitOfWork = ctx.app.get<IUnitOfWork>('IUnitOfWork');
-    registry = ctx.app.get(MessageHandlerRegistry);
     sqs = ctx.app.get(SQSClient);
 
-    const { QueueUrl } = await sqs.send(new GetQueueUrlCommand({ QueueName: 'work-order.fifo' }));
+    ctx.app.get(MessageHandlerRegistry).register(
+      'billing.quote.revert_approval',
+      (envelope) => {
+        received.push(envelope);
+
+        if (failFirstDelivery.delete(envelope.payload.quoteId)) {
+          return Promise.reject(new Error('first delivery fails'));
+        }
+
+        return Promise.resolve();
+      },
+      RevertApprovalPayload,
+    );
+
+    const { QueueUrl } = await sqs.send(new GetQueueUrlCommand({ QueueName: 'billing.fifo' }));
     queueUrl = QueueUrl as string;
 
     // A failed delivery comes back in 2 s instead of 30 s.
@@ -73,42 +77,26 @@ describe('Messaging (E2E)', () => {
         Attributes: { VisibilityTimeout: '2' },
       }),
     );
-
-    const customer = await ctx.prisma.customer.create({
-      data: {
-        name: 'Cliente Mensageria',
-        document: '52998224725',
-        email: 'mensageria@e2e.test',
-        phone: '11999999999',
-      },
-    });
-
-    const vehicle = await ctx.prisma.vehicle.create({
-      data: { customerId: customer.id, plate: 'MSG1A23', brand: 'Fiat', model: 'Uno', year: 2020 },
-    });
-
-    customerId = customer.id;
-    vehicleId = vehicle.id;
   });
 
   afterAll(async () => {
     await teardownTestApp(ctx);
   });
 
-  async function createWorkOrder(): Promise<string> {
-    const workOrder = await ctx.prisma.workOrder.create({
-      data: {
-        number: `9${(++workOrderCounter).toString().padStart(5, '0')}`,
-        customerId,
-        vehicleId,
-      },
-    });
-
-    return workOrder.id;
-  }
-
   function addMessage(message: OutboxMessage): Promise<void> {
     return unitOfWork.executeTransaction((repositories) => repositories.outbox.add(message));
+  }
+
+  function revertApproval(workOrderId: string, quoteId = randomUUID()): OutboxMessage {
+    return {
+      type: 'billing.quote.revert_approval',
+      workOrderId,
+      payload: { quoteId, revertTo: 'SENT' },
+    };
+  }
+
+  function receivedFor(workOrderId: string): MessageEnvelope<'billing.quote.revert_approval'>[] {
+    return received.filter((envelope) => envelope.workOrderId === workOrderId);
   }
 
   function countOutbox(workOrderId: string): Promise<number> {
@@ -129,36 +117,25 @@ describe('Messaging (E2E)', () => {
   }
 
   it('should publish an outbox message and consume it back through a test handler', async () => {
-    const received: MessageEnvelope[] = [];
-
-    registry.register(
-      'inventory.stock.reserved',
-      (envelope) => {
-        received.push(envelope);
-        return Promise.resolve();
-      },
-      StockReservedPayload,
-    );
-
-    const workOrderId = await createWorkOrder();
+    const workOrderId = randomUUID();
     const quoteId = randomUUID();
 
     const release = await holdRelayLock();
 
-    await addMessage({ type: 'inventory.stock.reserved', workOrderId, payload: { quoteId } });
+    await addMessage(revertApproval(workOrderId, quoteId));
 
     const row = await ctx.prisma.outboxMessage.findFirstOrThrow({ where: { workOrderId } });
 
     await release();
 
-    await waitFor(() => received.length === 1);
+    await waitFor(() => receivedFor(workOrderId).length === 1);
 
-    expect(received[0]).toEqual({
+    expect(receivedFor(workOrderId)[0]).toEqual({
       messageId: row.messageId,
-      type: 'inventory.stock.reserved',
+      type: 'billing.quote.revert_approval',
       occurredAt: row.createdAt.toISOString(),
       workOrderId,
-      payload: { quoteId },
+      payload: { quoteId, revertTo: 'SENT' },
     });
 
     expect(await countOutbox(workOrderId)).toBe(0);
@@ -179,17 +156,13 @@ describe('Messaging (E2E)', () => {
   });
 
   it('should leave no outbox row when the transaction rolls back', async () => {
-    const workOrderId = await createWorkOrder();
+    const workOrderId = randomUUID();
     // With the relay locked out, a row that wrongly committed would still be in the table.
     const release = await holdRelayLock();
 
     await expect(
       unitOfWork.executeTransaction(async (repositories) => {
-        await repositories.outbox.add({
-          type: 'inventory.stock.reserve',
-          workOrderId,
-          payload: { quoteId: randomUUID(), items: [] },
-        });
+        await repositories.outbox.add(revertApproval(workOrderId));
 
         throw new Error('rollback');
       }),
@@ -201,14 +174,10 @@ describe('Messaging (E2E)', () => {
   });
 
   it('should not publish while another transaction holds the relay lock', async () => {
-    const workOrderId = await createWorkOrder();
+    const workOrderId = randomUUID();
     const release = await holdRelayLock();
 
-    await addMessage({
-      type: 'inventory.stock.reserve',
-      workOrderId,
-      payload: { quoteId: randomUUID(), items: [] },
-    });
+    await addMessage(revertApproval(workOrderId));
 
     await new Promise((resolve) => setTimeout(resolve, 2_000));
 
@@ -220,48 +189,27 @@ describe('Messaging (E2E)', () => {
   });
 
   it('should keep the group order when the first message fails', async () => {
-    const seen: string[] = [];
-    let failed = false;
-
-    registry.register(
-      'billing.payment.approved',
-      ({ payload }) => {
-        seen.push(payload.paymentId);
-
-        if (payload.paymentId === 'A' && !failed) {
-          failed = true;
-          return Promise.reject(new Error('first delivery of A fails'));
-        }
-
-        return Promise.resolve();
-      },
-      PaymentApprovedPayload,
-    );
-
-    const workOrderId = await createWorkOrder();
-    const paidAt = new Date().toISOString();
+    const workOrderId = randomUUID();
+    const first = randomUUID();
+    const second = randomUUID();
+    failFirstDelivery.add(first);
 
     await unitOfWork.executeTransaction(async (repositories) => {
-      await repositories.outbox.add({
-        type: 'billing.payment.approved',
-        workOrderId,
-        payload: { paymentId: 'A', amount: '10.00', paidAt },
-      });
-
-      await repositories.outbox.add({
-        type: 'billing.payment.approved',
-        workOrderId,
-        payload: { paymentId: 'B', amount: '20.00', paidAt },
-      });
+      await repositories.outbox.add(revertApproval(workOrderId, first));
+      await repositories.outbox.add(revertApproval(workOrderId, second));
     });
 
-    await waitFor(() => seen.length === 3);
+    await waitFor(() => receivedFor(workOrderId).length === 3);
 
-    expect(seen).toEqual(['A', 'A', 'B']);
+    expect(receivedFor(workOrderId).map(({ payload }) => payload.quoteId)).toEqual([
+      first,
+      first,
+      second,
+    ]);
   });
 
   it('should not acknowledge a message without handler', async () => {
-    const workOrderId = await createWorkOrder();
+    const workOrderId = randomUUID();
 
     const unhandledLines = () =>
       ctx
@@ -273,9 +221,9 @@ describe('Messaging (E2E)', () => {
         );
 
     await addMessage({
-      type: 'inventory.stock.reservation_failed',
+      type: 'billing.payment.cancel',
       workOrderId,
-      payload: { quoteId: randomUUID(), missing: [] },
+      payload: { paymentId: randomUUID(), reason: 'e2e' },
     });
 
     await waitFor(() => unhandledLines().length >= 2);
