@@ -6,7 +6,7 @@ services:
     container_name: billing-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5434:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -43,7 +43,7 @@ services:
     container_name: billing-api
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3002:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -86,7 +86,7 @@ services:
     container_name: billing-localstack
     restart: unless-stopped
     ports:
-      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:4568:4566"
     volumes:
       - ./localstack/init-topology.sh:/etc/localstack/init/ready.d/init-topology.sh:ro
     healthcheck:
@@ -102,7 +102,7 @@ services:
     restart: unless-stopped
     command: ["valkey-server", "--requirepass", "valkey"]
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6381:6379"
     healthcheck:
       test: ["CMD", "valkey-cli", "-a", "valkey", "ping"]
       interval: 5s
