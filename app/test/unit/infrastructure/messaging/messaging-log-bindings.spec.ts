@@ -6,7 +6,7 @@ describe('messagingLogBindings', () => {
     expect(
       messagingLogBindings({
         system: 'aws_sqs',
-        destination: 'work-order.fifo',
+        destination: 'billing.fifo',
         messageId: 'msg-1',
         operation: 'process',
         type: 'inventory.stock.reserved',
@@ -14,7 +14,7 @@ describe('messagingLogBindings', () => {
       }),
     ).toEqual({
       'messaging.system': 'aws_sqs',
-      'messaging.destination.name': 'work-order.fifo',
+      'messaging.destination.name': 'billing.fifo',
       'messaging.message.id': 'msg-1',
       'messaging.operation': 'process',
       'oficina.messaging.message.type': 'inventory.stock.reserved',

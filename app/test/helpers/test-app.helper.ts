@@ -3,13 +3,12 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { Logger } from 'nestjs-pino';
 import { join } from 'path';
-import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
+import { Wait } from 'testcontainers';
 import { LocalstackContainer, StartedLocalStackContainer } from '@testcontainers/localstack';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { StartedValkeyContainer, ValkeyContainer } from '@testcontainers/valkey';
 import type { Server } from 'http';
 import { execSync } from 'child_process';
-import { lookup } from 'dns/promises';
 import type { DestinationStream } from 'pino';
 
 import { AppModule } from '../../src/app.module';
@@ -19,17 +18,10 @@ import { OutboxRelayService } from '../../src/infrastructure/messaging/outbox-re
 import { SqsConsumerService } from '../../src/infrastructure/messaging/sqs-consumer.service';
 import { LOGGER_DESTINATION, LOGGER_LEVEL } from '../../src/infrastructure/logging/logging.module';
 import {
-  CUSTOMER_JWT_TEST_PUBLIC_KEY,
-  CUSTOMER_JWT_TEST_ISSUER,
-  CUSTOMER_JWT_TEST_AUDIENCE,
-} from './customer-jwt.helper';
-import {
   STAFF_JWT_TEST_AUDIENCE,
   STAFF_JWT_TEST_ISSUER,
   STAFF_JWT_TEST_KEY_ID,
-  STAFF_JWT_TEST_PRIVATE_KEY,
   STAFF_JWT_TEST_PUBLIC_KEY,
-  STAFF_REFRESH_TEST_PRIVATE_KEY,
 } from './staff-jwt.helper';
 
 export interface LogCapture {
@@ -43,7 +35,6 @@ export interface TestContext {
   httpServer: Server;
   prisma: PrismaService;
   postgresContainer: StartedPostgreSqlContainer;
-  mailhogContainer: StartedTestContainer;
   valkeyContainer: StartedValkeyContainer;
   localstackContainer?: StartedLocalStackContainer;
   logCapture?: LogCapture;
@@ -111,13 +102,9 @@ function createLogCapture(): LogCaptureSeam {
 
 export async function setupTestApp(options: SetupTestAppOptions = {}): Promise<TestContext> {
   const postgresContainer = await new PostgreSqlContainer('postgres:18-alpine')
-    .withDatabase('test_db')
+    .withDatabase('billing')
     .withUsername('test')
     .withPassword('test')
-    .start();
-
-  const mailhogContainer = await new GenericContainer('mailhog/mailhog:v1.0.1')
-    .withExposedPorts(1025, 8025)
     .start();
 
   const valkeyContainer = await new ValkeyContainer('valkey/valkey:9.1')
@@ -142,30 +129,19 @@ export async function setupTestApp(options: SetupTestAppOptions = {}): Promise<T
     process.env.AWS_REGION = 'us-east-1';
     process.env.AWS_ACCESS_KEY_ID = 'test';
     process.env.AWS_SECRET_ACCESS_KEY = 'test';
-    process.env.WORK_ORDER_QUEUE_NAME = 'work-order.fifo';
+    process.env.BILLING_QUEUE_NAME = 'billing.fifo';
     process.env.MESSAGING_TOPIC_ARN = 'arn:aws:sns:us-east-1:000000000000:oficina-events.fifo';
   }
 
   const databaseUrl = postgresContainer.getConnectionUri();
 
   process.env.DATABASE_URL = databaseUrl;
-  // nodemailer resolves hostnames through DNS servers, not the hosts file: with 15 suites booting
-  // at once a dropped query for "localhost" costs a 5 s retry and expires the 5 s Prisma transaction.
-  process.env.MAIL_HOST = (await lookup(mailhogContainer.getHost(), { family: 4 })).address;
-  process.env.MAIL_PORT = mailhogContainer.getMappedPort(1025).toString();
   process.env.CACHE_URL = valkeyContainer.getConnectionUrl();
   process.env.CACHE_TTL_SECONDS = '43200';
-  process.env.STAFF_JWT_PRIVATE_KEY = STAFF_JWT_TEST_PRIVATE_KEY;
   process.env.STAFF_JWT_PUBLIC_KEY = STAFF_JWT_TEST_PUBLIC_KEY;
   process.env.STAFF_JWT_KEY_ID = STAFF_JWT_TEST_KEY_ID;
   process.env.STAFF_JWT_ISSUER = STAFF_JWT_TEST_ISSUER;
   process.env.STAFF_JWT_AUDIENCE = STAFF_JWT_TEST_AUDIENCE;
-  process.env.STAFF_JWT_EXPIRATION = '10m';
-  process.env.STAFF_JWT_REFRESH_PRIVATE_KEY = STAFF_REFRESH_TEST_PRIVATE_KEY;
-  process.env.STAFF_JWT_REFRESH_EXPIRATION = '7d';
-  process.env.CUSTOMER_JWT_PUBLIC_KEY = CUSTOMER_JWT_TEST_PUBLIC_KEY;
-  process.env.CUSTOMER_JWT_ISSUER = CUSTOMER_JWT_TEST_ISSUER;
-  process.env.CUSTOMER_JWT_AUDIENCE = CUSTOMER_JWT_TEST_AUDIENCE;
 
   execSync('npx prisma migrate deploy', {
     env: { ...process.env },
@@ -218,7 +194,6 @@ export async function setupTestApp(options: SetupTestAppOptions = {}): Promise<T
     httpServer,
     prisma,
     postgresContainer,
-    mailhogContainer,
     valkeyContainer,
     localstackContainer,
     logCapture: logCaptureSeam?.capture,
@@ -228,7 +203,6 @@ export async function setupTestApp(options: SetupTestAppOptions = {}): Promise<T
 export async function teardownTestApp(ctx: TestContext): Promise<void> {
   if (ctx?.app) await ctx.app.close();
   if (ctx?.postgresContainer) await ctx.postgresContainer.stop();
-  if (ctx?.mailhogContainer) await ctx.mailhogContainer.stop();
   if (ctx?.valkeyContainer) await ctx.valkeyContainer.stop();
   if (ctx?.localstackContainer) await ctx.localstackContainer.stop();
 }

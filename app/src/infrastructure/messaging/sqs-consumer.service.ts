@@ -57,7 +57,7 @@ export class SqsConsumerService implements OnApplicationBootstrap, BeforeApplica
     private readonly pinoLogger: PinoLogger,
     @Inject('ILogger') private readonly logger: ILogger,
   ) {
-    this.queueName = config.getOrThrow<string>('WORK_ORDER_QUEUE_NAME');
+    this.queueName = config.getOrThrow<string>('BILLING_QUEUE_NAME');
     this.consumedMessagesCounterMetric = metrics
       .getMeter('oficina.messaging')
       .createCounter('oficina.messaging.consumed', { unit: '{message}' });

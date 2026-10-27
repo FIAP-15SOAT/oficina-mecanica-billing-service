@@ -28,7 +28,7 @@ import { createMockLogger } from '../../../helpers/logger-mock.factory';
 
 jest.mock('sqs-consumer');
 
-const QUEUE_URL = 'http://localhost:4566/000000000000/work-order.fifo';
+const QUEUE_URL = 'http://localhost:4566/000000000000/billing.fifo';
 const MESSAGE_ID = '6f1c1a8e-3b9a-4c1e-9c51-2f9d6f3b7a10';
 const WORK_ORDER_ID = '2a7c4d1e-8f3b-4a6c-9d2e-5b1f0c7e3a94';
 const QUOTE_ID = '9b3e2f1a-7c6d-4e5f-8a9b-0c1d2e3f4a5b';
@@ -113,7 +113,7 @@ describe('SqsConsumerService', () => {
     service = new SqsConsumerService(
       sqs as unknown as SQSClient,
       registry,
-      { getOrThrow: jest.fn().mockReturnValue('work-order.fifo') } as unknown as ConfigService,
+      { getOrThrow: jest.fn().mockReturnValue('billing.fifo') } as unknown as ConfigService,
       pinoLogger as unknown as PinoLogger,
       logger,
     );
@@ -126,19 +126,19 @@ describe('SqsConsumerService', () => {
       .find((candidate) => candidate.descriptor.name === 'oficina.messaging.consumed');
     const counts: Record<string, number> = {};
     for (const point of metric?.dataPoints ?? []) {
-      expect(point.attributes['messaging.destination.name']).toBe('work-order.fifo');
+      expect(point.attributes['messaging.destination.name']).toBe('billing.fifo');
       counts[point.attributes.outcome as string] = point.value as number;
     }
     return counts;
   }
 
   describe('onApplicationBootstrap', () => {
-    it('should resolve the queue URL from WORK_ORDER_QUEUE_NAME and start the consumer', async () => {
+    it('should resolve the queue URL from BILLING_QUEUE_NAME and start the consumer', async () => {
       await service.onApplicationBootstrap();
 
       const command = sqs.send.mock.calls[0][0] as GetQueueUrlCommand;
       expect(command).toBeInstanceOf(GetQueueUrlCommand);
-      expect(command.input).toEqual({ QueueName: 'work-order.fifo' });
+      expect(command.input).toEqual({ QueueName: 'billing.fifo' });
       expect(Consumer.create).toHaveBeenCalledWith(
         expect.objectContaining({
           queueUrl: QUEUE_URL,
@@ -503,14 +503,14 @@ describe('SqsConsumerService', () => {
 
       const [span] = spanExporter.getFinishedSpans();
 
-      expect(span.name).toBe('process work-order.fifo');
+      expect(span.name).toBe('process billing.fifo');
 
       expect(span.spanContext().traceId).toBe(TRACE_ID);
 
       expect(handlerSuppressed).toBe(false);
     });
 
-    it('should open a CONSUMER span named process work-order.fifo, child of the traceparent attribute', async () => {
+    it('should open a CONSUMER span named process billing.fifo, child of the traceparent attribute', async () => {
       registry.register(
         'inventory.stock.reserved',
         jest.fn().mockResolvedValue(undefined),
@@ -520,13 +520,13 @@ describe('SqsConsumerService', () => {
       await service.handleMessage(createMessage({}, 1, { traceparent: true }));
 
       const [span] = spanExporter.getFinishedSpans();
-      expect(span.name).toBe('process work-order.fifo');
+      expect(span.name).toBe('process billing.fifo');
       expect(span.kind).toBe(SpanKind.CONSUMER);
       expect(span.spanContext().traceId).toBe(TRACE_ID);
       expect(span.parentSpanContext?.spanId).toBe(PARENT_SPAN_ID);
       expect(span.attributes).toEqual({
         'messaging.system': 'aws_sqs',
-        'messaging.destination.name': 'work-order.fifo',
+        'messaging.destination.name': 'billing.fifo',
         'messaging.message.id': MESSAGE_ID,
         'messaging.operation.type': 'process',
       });
@@ -559,7 +559,7 @@ describe('SqsConsumerService', () => {
       expect(pinoLogger.runInContext).toHaveBeenCalledWith(expect.any(Function), {
         bindings: messagingLogBindings({
           system: 'aws_sqs',
-          destination: 'work-order.fifo',
+          destination: 'billing.fifo',
           messageId: MESSAGE_ID,
           operation: 'process',
           type: 'inventory.stock.reserved',
@@ -576,7 +576,7 @@ describe('SqsConsumerService', () => {
       expect(pinoLogger.runInContext).toHaveBeenCalledWith(expect.any(Function), {
         bindings: messagingLogBindings({
           system: 'aws_sqs',
-          destination: 'work-order.fifo',
+          destination: 'billing.fifo',
           messageId: 'sqs-message-id',
           operation: 'process',
         }),
