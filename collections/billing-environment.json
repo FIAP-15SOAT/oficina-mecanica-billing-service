@@ -1,0 +1,13 @@
+{
+  "id": "27d0e00c-85a0-508a-bda4-39e61c77a93d",
+  "name": "Billing API",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3002",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}
