@@ -49,6 +49,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       header.kid !== this.keyId ||
       payload.typ !== 'access' ||
       typeof payload.exp !== 'number' ||
+      typeof payload.sub !== 'string' ||
+      typeof payload.email !== 'string' ||
       !USER_ROLES.includes(payload.role)
     ) {
       throw new UnauthorizedException('Token inválido');

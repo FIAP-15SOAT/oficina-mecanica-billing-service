@@ -68,6 +68,8 @@ describe('JwtStrategy', () => {
     ['with a null role', asVerifiedToken({ role: null })],
     ['without role', asVerifiedToken({ role: undefined })],
     ['with a role outside the user roles', asVerifiedToken({ role: 'CUSTOMER' as UserRole })],
+    ['without sub', asVerifiedToken({ sub: undefined })],
+    ['without email', asVerifiedToken({ email: undefined })],
   ])('rejects a token %s', (_case, token) => {
     expect(() => strategy.validate(token)).toThrow(new UnauthorizedException('Token inválido'));
   });
