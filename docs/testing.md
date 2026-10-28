@@ -26,7 +26,7 @@ npm run test:cov
 
 Os scripts rodam o Jest como `node --experimental-vm-modules node_modules/jest/bin/jest.js`, nunca `npx jest`: os pacotes do NestJS 12 são só ESM, e sem a flag as suítes que importam `@nestjs/*` falham com `Must use import to load ES Module`. Para um arquivo só: `npm test -- <caminho>`.
 
-São 59 suítes e 826 testes em `test/unit/`, que espelha `src/`. Cada classe é instanciada direto, com mocks tipados das factories de `test/helpers/` (`createMockLogger()`, `createMockUnitOfWork()`, `createMockCache()` e outras), sem Nest DI e sem banco.
+São 59 suítes e 828 testes em `test/unit/`, que espelha `src/`. Cada classe é instanciada direto, com mocks tipados das factories de `test/helpers/` (`createMockLogger()`, `createMockUnitOfWork()`, `createMockCache()` e outras), sem Nest DI e sem banco.
 
 A cobertura é **100% em lines, statements, functions e branches**, e o piso está em `package.json` → `jest.coverageThreshold`: o `npm run test:cov`, e com ele o job `Unit Tests` do CI, falha quando qualquer métrica cai abaixo de 100%. A coleta abrange todo `src/`, menos `*.module.ts`, `main.ts`, `otel.ts`, `*.enums.ts`, `*.config.ts`, `*.exception.ts`, `*.dto.ts` e `prisma.service.ts`. O `otel.ts` é coberto pelo `npm run test:smoke`, num processo real, no job `Build` do CI.
 

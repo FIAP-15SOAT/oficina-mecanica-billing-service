@@ -16,7 +16,7 @@ O broker é o da AWS: Amazon SNS e SQS. O SNS não participa da transação do P
 
 1. **A mensagem é uma linha da tabela `outbox`**, gravada pelo `IOutboxRepository` dentro da mesma transação do `IUnitOfWork` que muda o estado. Tipo e payload vêm de um catálogo tipado e fechado em `domain/messaging/`: tipo desconhecido não compila. O contexto W3C do trace é gravado na linha.
 2. **O relay roda no processo** (`OutboxRelayService`), a cada 500 ms: abre uma transação, toma `pg_try_advisory_xact_lock` (uma réplica publica por vez), lê até 10 linhas pelo `id`, publica uma a uma e apaga as publicadas na mesma transação. Na primeira falha, o lote para.
-3. **Um tópico FIFO** (`oficina-events.fifo`) e **uma fila FIFO por serviço**, com filter policy por `type`. A `billing.fifo` recebe só `billing.quote.revert_approval` e `billing.payment.cancel`. `MessageGroupId` = `workOrderId`; `MessageDeduplicationId` = `messageId`.
+3. **Um tópico FIFO** (`oficina-events.fifo`) e **uma fila FIFO por serviço**, com filter policy por `type`. A `billing.fifo` recebe só `billing.quote.revert_approval` e `billing.payment.cancel`. `MessageGroupId` = `workOrderId` (ordem por OS; sem OS, o próprio `messageId`); `MessageDeduplicationId` = `messageId`.
 4. **Envelope com cinco campos**: `messageId`, `type`, `occurredAt`, `workOrderId` e `payload`.
 5. **O consumidor confirma só no sucesso.** O `SqsConsumerService` processa uma mensagem por vez. Erro, envelope inválido ou tipo sem handler deixam a mensagem na fila; na quinta entrega, o SQS a move para a `billing-dlq.fifo`. Os handlers são idempotentes pelo `messageId` ou pelo estado.
 
