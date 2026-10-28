@@ -1,0 +1,104 @@
+name: DAST
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: dast-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  COMPOSE_FILE: app/docker-compose.yml
+  COMPOSE_PROJECT_NAME: dast
+  API_BASE_URL: http://localhost:3002
+  STACK_WAIT_TIMEOUT: 180
+  STAFF_JWT_KEY_ID: staff-dast
+
+jobs:
+  zap-scan:
+    name: OWASP ZAP API Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # Ephemeral staff key pair, generated on every run — never committed. The
+      # job signs its own staff token, playing the role of the Identity service.
+      - name: Generate an ephemeral RS256 key pair for the staff token
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/staff-jwt.key
+          openssl pkey -in /tmp/staff-jwt.key -pubout -out /tmp/staff-jwt.pub
+          echo "STAFF_JWT_PUBLIC_KEY=$(awk 'NF {sub(/\r/, ""); printf "%s\\n", $0}' /tmp/staff-jwt.pub)" >> "$GITHUB_ENV"
+
+      - name: Start the target stack and wait for it to become healthy
+        run: |
+          if ! docker compose up -d --build --wait --wait-timeout "$STACK_WAIT_TIMEOUT"; then
+            echo "::error::The stack did not become healthy within ${STACK_WAIT_TIMEOUT}s."
+            docker compose ps --all
+            docker compose logs --no-color --tail 200
+            exit 1
+          fi
+
+      - name: Check the OpenAPI document through the published port
+        run: curl -fsS "$API_BASE_URL/api/docs-json" > /dev/null
+
+      - name: Sign an ephemeral staff JWT for the scan
+        run: |
+          b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+
+          now="$(date +%s)"
+          exp="$((now + 600))"
+          header="{\"alg\":\"RS256\",\"typ\":\"JWT\",\"kid\":\"${STAFF_JWT_KEY_ID}\"}"
+          payload="{\"sub\":\"00000000-0000-4000-8000-00000000da57\",\"email\":\"dast@oficina.local\",\"name\":\"DAST\",\"role\":\"ADMIN\",\"typ\":\"access\",\"iss\":\"oficina-identity\",\"aud\":\"oficina-services\",\"iat\":${now},\"exp\":${exp}}"
+
+          header_b64="$(printf '%s' "$header" | b64url)"
+          payload_b64="$(printf '%s' "$payload" | b64url)"
+          signing_input="${header_b64}.${payload_b64}"
+          signature="$(printf '%s' "$signing_input" | openssl dgst -sha256 -sign /tmp/staff-jwt.key | b64url)"
+          token="${signing_input}.${signature}"
+          rm /tmp/staff-jwt.key
+
+          echo "::add-mask::$token"
+          echo "ZAP_AUTH_HEADER_VALUE=Bearer $token" >> "$GITHUB_ENV"
+
+      - name: Prepare the ZAP work directory
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/zap-work"
+          cp .zap/rules.tsv "$GITHUB_WORKSPACE/zap-work/rules.tsv"
+          chmod -R 777 "$GITHUB_WORKSPACE/zap-work"
+
+      - name: Run OWASP ZAP API scan
+        run: |
+          # ZAP 2.17.0 (stable) pinned by digest — bump with: docker buildx imagetools inspect ghcr.io/zaproxy/zaproxy:stable
+          docker run --rm \
+            --network "${COMPOSE_PROJECT_NAME}_default" \
+            -v "$GITHUB_WORKSPACE/zap-work:/zap/wrk:rw" \
+            -e ZAP_AUTH_HEADER=Authorization \
+            -e ZAP_AUTH_HEADER_VALUE="$ZAP_AUTH_HEADER_VALUE" \
+            ghcr.io/zaproxy/zaproxy@sha256:8d387b1a63e3425beef4846e39719f5af2a787753af2d8b6558c6257d7a577a2 \
+            zap-api-scan.py \
+              -t http://api:3000/api/docs-json \
+              -f openapi \
+              -c rules.tsv \
+              -r zap-report.html \
+              -J zap-report.json
+
+      - name: Upload the ZAP report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zap-report
+          path: |
+            zap-work/zap-report.html
+            zap-work/zap-report.json
+          if-no-files-found: warn
+
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v
