@@ -6,7 +6,7 @@ import { MetricAttributeName } from '@application/metrics/metric-attribute';
 export type MetricCardinality = 'fixed' | 'low';
 
 export interface MetricRegistryEntry {
-  /** Physical name. This is where — and the only place where — the `oficina.` namespace appears. */
+  /** Physical name. Only here — nowhere else — does the `oficina.` namespace appear. */
   key: string;
   aggregation: AggregationOption;
 }

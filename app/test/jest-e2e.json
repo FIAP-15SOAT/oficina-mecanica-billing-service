@@ -29,8 +29,7 @@
     "!src/**/*.enum.ts",
     "!src/**/*.exception.ts",
     "!src/**/*.vo.ts",
-    "!src/**/*.module.ts",
-    "!src/domain/constants/work-order-status-priority.constant.ts"
+    "!src/**/*.module.ts"
   ],
   "moduleNameMapper": {
     "^@application/(.*)$": "<rootDir>/src/application/$1",
