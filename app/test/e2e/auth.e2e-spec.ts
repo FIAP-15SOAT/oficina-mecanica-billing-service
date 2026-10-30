@@ -49,7 +49,7 @@ describe('Authentication (E2E)', () => {
     expect(response.body).toEqual({
       statusCode: 401,
       error: expect.any(String),
-      message: 'Token de autenticação inválido ou ausente.',
+      message: 'Token de autenticação inválido ou ausente',
     });
   });
 
