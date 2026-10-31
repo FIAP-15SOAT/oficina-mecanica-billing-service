@@ -40,7 +40,9 @@ export class QuoteItemValidator {
     return { services, partsSupplies };
   }
 
-  async resolveServiceItems(inputs: ServiceInput[]): Promise<CreateQuoteItemServiceProps[]> {
+  private async resolveServiceItems(
+    inputs: ServiceInput[],
+  ): Promise<CreateQuoteItemServiceProps[]> {
     const services = await this.resolveExisting(
       inputs.map((input) => input.serviceId),
       (ids) => this.inventoryCatalogGateway.findServicesByIds(ids),
@@ -54,7 +56,7 @@ export class QuoteItemValidator {
     }));
   }
 
-  async resolvePartSupplyItems(
+  private async resolvePartSupplyItems(
     inputs: PartSupplyInput[],
   ): Promise<CreateQuoteItemPartSupplyProps[]> {
     const partsSupplies = await this.resolveExisting(

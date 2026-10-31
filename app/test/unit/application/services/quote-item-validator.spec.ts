@@ -1,5 +1,6 @@
 import { QuoteItemValidator } from '@application/services/quote-item-validator';
 import { ResourceNotFoundException } from '@application/exceptions/resource-not-found.exception';
+import { IInventoryCatalogGateway } from '@application/ports/output/gateways/inventory/inventory-catalog-gateway.interface';
 import { BusinessRuleViolationException } from '@domain/exceptions/business-rule-violation.exception';
 
 import {
@@ -9,63 +10,16 @@ import {
 } from '../../../helpers/inventory-catalog-gateway-mock.factory';
 
 describe('QuoteItemValidator', () => {
-  const inventoryCatalogGateway = createMockInventoryCatalogGateway();
-  const validator = new QuoteItemValidator(inventoryCatalogGateway);
+  let validator: QuoteItemValidator;
+  let inventoryCatalogGateway: jest.Mocked<IInventoryCatalogGateway>;
 
-  beforeEach(() => jest.resetAllMocks());
-
-  describe('resolveServiceItems()', () => {
-    it('returns empty array when inputs are empty', async () => {
-      await expect(validator.resolveServiceItems([])).resolves.toEqual([]);
-      expect(inventoryCatalogGateway.findServicesByIds).not.toHaveBeenCalled();
-    });
-
-    it('prices each service with the inventory base price', async () => {
-      const service = createMockInventoryServiceGatewayResponse({ basePrice: 100 });
-
-      inventoryCatalogGateway.findServicesByIds.mockResolvedValue([service]);
-
-      await expect(
-        validator.resolveServiceItems([{ serviceId: service.id, quantity: 2 }]),
-      ).resolves.toEqual([{ serviceId: service.id, unitPrice: 100, quantity: 2 }]);
-    });
-
-    it('throws not found for an id absent from the inventory', async () => {
-      inventoryCatalogGateway.findServicesByIds.mockResolvedValue([]);
-
-      await expect(
-        validator.resolveServiceItems([{ serviceId: 'unknown-service-id', quantity: 1 }]),
-      ).rejects.toThrow(new ResourceNotFoundException('Serviço', 'unknown-service-id'));
-    });
-  });
-
-  describe('resolvePartSupplyItems()', () => {
-    it('returns [] when inputs are empty', async () => {
-      await expect(validator.resolvePartSupplyItems([])).resolves.toEqual([]);
-      expect(inventoryCatalogGateway.findPartsSuppliesByIds).not.toHaveBeenCalled();
-    });
-
-    it('prices each part supply with the inventory sale price', async () => {
-      const partSupply = createMockInventoryPartSupplyGatewayResponse({ salePrice: 50 });
-
-      inventoryCatalogGateway.findPartsSuppliesByIds.mockResolvedValue([partSupply]);
-
-      await expect(
-        validator.resolvePartSupplyItems([{ partSupplyId: partSupply.id, quantity: 3 }]),
-      ).resolves.toEqual([{ partSupplyId: partSupply.id, unitPrice: 50, quantity: 3 }]);
-    });
-
-    it('throws not found for an id absent from the inventory', async () => {
-      inventoryCatalogGateway.findPartsSuppliesByIds.mockResolvedValue([]);
-
-      await expect(
-        validator.resolvePartSupplyItems([{ partSupplyId: 'unknown-part-id', quantity: 1 }]),
-      ).rejects.toThrow(new ResourceNotFoundException('Peça/Insumo', 'unknown-part-id'));
-    });
+  beforeEach(() => {
+    inventoryCatalogGateway = createMockInventoryCatalogGateway();
+    validator = new QuoteItemValidator(inventoryCatalogGateway);
   });
 
   describe('validateAndResolve()', () => {
-    it('validates then returns the priced services and parts', async () => {
+    it('should price services with the base price and parts with the sale price', async () => {
       const service = createMockInventoryServiceGatewayResponse({ basePrice: 100 });
       const partSupply = createMockInventoryPartSupplyGatewayResponse({ salePrice: 50 });
 
@@ -83,7 +37,39 @@ describe('QuoteItemValidator', () => {
       });
     });
 
-    it('rejects parts without a service before any lookup', async () => {
+    it('should not read the inventory when there are no items', async () => {
+      await expect(validator.validateAndResolve([], [])).resolves.toEqual({
+        services: [],
+        partsSupplies: [],
+      });
+
+      expect(inventoryCatalogGateway.findServicesByIds).not.toHaveBeenCalled();
+      expect(inventoryCatalogGateway.findPartsSuppliesByIds).not.toHaveBeenCalled();
+    });
+
+    it('should throw not found for a service absent from the inventory', async () => {
+      inventoryCatalogGateway.findServicesByIds.mockResolvedValue([]);
+
+      await expect(
+        validator.validateAndResolve([{ serviceId: 'unknown-service-id', quantity: 1 }], []),
+      ).rejects.toThrow(new ResourceNotFoundException('Serviço', 'unknown-service-id'));
+    });
+
+    it('should throw not found for a part supply absent from the inventory', async () => {
+      const service = createMockInventoryServiceGatewayResponse();
+
+      inventoryCatalogGateway.findServicesByIds.mockResolvedValue([service]);
+      inventoryCatalogGateway.findPartsSuppliesByIds.mockResolvedValue([]);
+
+      await expect(
+        validator.validateAndResolve(
+          [{ serviceId: service.id, quantity: 1 }],
+          [{ partSupplyId: 'unknown-part-id', quantity: 1 }],
+        ),
+      ).rejects.toThrow(new ResourceNotFoundException('Peça/Insumo', 'unknown-part-id'));
+    });
+
+    it('should reject parts without a service before any lookup', async () => {
       await expect(
         validator.validateAndResolve([], [{ partSupplyId: 'part-id', quantity: 1 }]),
       ).rejects.toThrow(BusinessRuleViolationException);
@@ -92,7 +78,7 @@ describe('QuoteItemValidator', () => {
       expect(inventoryCatalogGateway.findPartsSuppliesByIds).not.toHaveBeenCalled();
     });
 
-    it('rejects duplicate service ids before any lookup', async () => {
+    it('should reject duplicate service ids before any lookup', async () => {
       await expect(
         validator.validateAndResolve(
           [
