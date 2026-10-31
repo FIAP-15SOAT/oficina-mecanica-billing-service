@@ -15,7 +15,7 @@ A solução tem quatro serviços NestJS (Work Order, Identity, Billing e Invento
 O Billing segue a mesma Clean Architecture do Work Order, com quatro camadas e dependências apontando só para dentro:
 
 - **`domain/`**: entidades, value objects, invariantes, contratos de repositório e o catálogo de mensagens. Livre de framework e ORM.
-- **`application/`**: casos de uso, portas de entrada e de saída (`ILogger`, `IMetrics`, `ICache`, `IInternalHttpClient`) e catálogos de eventos e métricas. Livre de framework e ORM.
+- **`application/`**: casos de uso, portas de entrada e de saída (`ILogger`, `IMetrics`, `ICache` e os gateways dos outros serviços) e catálogos de eventos e métricas. Livre de framework e ORM.
 - **`interface-adapters/`**: Clean Controllers e Presenters, POJOs que traduzem entre casos de uso e o formato HTTP.
 - **`infrastructure/`**: a borda NestJS (controllers finos, guards, DTOs com `@ApiProperty`, filtros), o Prisma, o SNS/SQS, o Valkey, o cliente HTTP e o logging.
 

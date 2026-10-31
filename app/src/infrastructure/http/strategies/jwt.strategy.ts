@@ -4,7 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import type { JwtHeader } from 'jsonwebtoken';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
-import { AuthenticatedPrincipal } from '@application/ports/output/authenticated-principal';
+import { AuthenticatedPrincipal } from '@application/auth/authenticated-principal';
 import { UserRole } from '@domain/enums/user-role.enum';
 import { readPemKey } from '@infrastructure/utils/read-pem-key.util';
 import { STAFF_TOKEN_ALGORITHM } from '@infrastructure/services/staff-token.constants';
