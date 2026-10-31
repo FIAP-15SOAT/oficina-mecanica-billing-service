@@ -10,19 +10,24 @@ import {
   createMockWorkOrderGateway,
   createMockWorkOrderGatewayResponse,
 } from '../../../helpers/work-order-gateway-mock.factory';
+import { IWorkOrderGateway } from '@application/ports/output/gateways/work-order/work-order-gateway.interface';
 
 describe('QuoteWorkOrderPolicy', () => {
-  const workOrderGateway = createMockWorkOrderGateway();
-  const policy = new QuoteWorkOrderPolicy(workOrderGateway);
   const workOrderId = '6f1c2b9e-4d3a-4e8b-9c7d-2a1b3c4d5e6f';
 
-  beforeEach(() => jest.resetAllMocks());
+  let policy: QuoteWorkOrderPolicy;
+  let workOrderGateway: jest.Mocked<IWorkOrderGateway>;
+
+  beforeEach(() => {
+    workOrderGateway = createMockWorkOrderGateway();
+    policy = new QuoteWorkOrderPolicy(workOrderGateway);
+  });
 
   it.each([
     WorkOrderStatus.IN_DIAGNOSIS,
     WorkOrderStatus.AWAITING_APPROVAL,
     WorkOrderStatus.REJECTED,
-  ])('accepts creation and submission for a %s work order', async (status) => {
+  ])('should accept creation and submission for a %s work order', async (status) => {
     workOrderGateway.findById.mockResolvedValue(
       createMockWorkOrderGatewayResponse({ status: status }),
     );
@@ -32,7 +37,7 @@ describe('QuoteWorkOrderPolicy', () => {
     expect(workOrderGateway.findById).toHaveBeenCalledWith(workOrderId);
   });
 
-  it('refuses creation for a RECEIVED work order naming the allowed statuses', async () => {
+  it('should refuse creation for a RECEIVED work order naming the allowed statuses', async () => {
     workOrderGateway.findById.mockResolvedValue(
       createMockWorkOrderGatewayResponse({ status: WorkOrderStatus.RECEIVED }),
     );
@@ -44,7 +49,7 @@ describe('QuoteWorkOrderPolicy', () => {
     );
   });
 
-  it('refuses submission for a RECEIVED work order naming the allowed statuses', async () => {
+  it('should refuse submission for a RECEIVED work order naming the allowed statuses', async () => {
     workOrderGateway.findById.mockResolvedValue(
       createMockWorkOrderGatewayResponse({ status: WorkOrderStatus.RECEIVED }),
     );
@@ -56,7 +61,7 @@ describe('QuoteWorkOrderPolicy', () => {
     );
   });
 
-  it('accepts approval when the work order is AWAITING_APPROVAL', async () => {
+  it('should accept approval when the work order is AWAITING_APPROVAL', async () => {
     workOrderGateway.findById.mockResolvedValue(
       createMockWorkOrderGatewayResponse({ status: WorkOrderStatus.AWAITING_APPROVAL }),
     );
@@ -64,7 +69,7 @@ describe('QuoteWorkOrderPolicy', () => {
     await expect(policy.ensureAwaitingApproval(workOrderId)).resolves.toBeUndefined();
   });
 
-  it('refuses approval when the work order is not AWAITING_APPROVAL', async () => {
+  it('should refuse approval when the work order is not AWAITING_APPROVAL', async () => {
     workOrderGateway.findById.mockResolvedValue(
       createMockWorkOrderGatewayResponse({ status: WorkOrderStatus.IN_DIAGNOSIS }),
     );
@@ -76,14 +81,14 @@ describe('QuoteWorkOrderPolicy', () => {
     );
   });
 
-  it('propagates the work order 404', async () => {
+  it('should propagate the work order 404', async () => {
     const notFound = new ServiceRequestRejectedException(404, 'Ordem de Serviço não encontrado(a)');
     workOrderGateway.findById.mockRejectedValue(notFound);
 
     await expect(policy.ensureCanCreateQuote(workOrderId)).rejects.toBe(notFound);
   });
 
-  it('propagates the work order unavailability as 503', async () => {
+  it('should propagate the work order unavailability as 503', async () => {
     const unavailable = new ServiceIntegrationException('Serviço de destino indisponível.');
     workOrderGateway.findById.mockRejectedValue(unavailable);
 
@@ -91,7 +96,7 @@ describe('QuoteWorkOrderPolicy', () => {
   });
 
   describe('ensureNoApprovedQuote', () => {
-    it('refuses when another quote of the work order is APPROVED', () => {
+    it('should refuse when another quote of the work order is APPROVED', () => {
       const quotes = [
         createMockQuote({ status: QuoteStatus.SENT }),
         createMockQuote({ status: QuoteStatus.APPROVED }),
@@ -102,7 +107,7 @@ describe('QuoteWorkOrderPolicy', () => {
       );
     });
 
-    it('accepts when no quote is APPROVED', () => {
+    it('should accept when no quote is APPROVED', () => {
       const quotes = [
         createMockQuote({ status: QuoteStatus.PENDING }),
         createMockQuote({ status: QuoteStatus.REJECTED }),

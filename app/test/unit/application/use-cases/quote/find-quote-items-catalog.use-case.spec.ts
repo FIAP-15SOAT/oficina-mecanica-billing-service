@@ -10,14 +10,18 @@ import {
   createMockQuotePartSupply,
   createMockQuoteService,
 } from '../../../../helpers/quote-mock.factory';
+import { IInventoryCatalogGateway } from '@application/ports/output/gateways/inventory/inventory-catalog-gateway.interface';
 
 describe('FindQuoteItemsCatalogUseCase', () => {
-  const inventoryCatalogGateway = createMockInventoryCatalogGateway();
-  const useCase = new FindQuoteItemsCatalogUseCase(inventoryCatalogGateway);
+  let useCase: FindQuoteItemsCatalogUseCase;
+  let inventoryCatalogGateway: jest.Mocked<IInventoryCatalogGateway>;
 
-  beforeEach(() => jest.resetAllMocks());
+  beforeEach(() => {
+    inventoryCatalogGateway = createMockInventoryCatalogGateway();
+    useCase = new FindQuoteItemsCatalogUseCase(inventoryCatalogGateway);
+  });
 
-  it('reads services and parts in parallel', () => {
+  it('should read services and parts in parallel', () => {
     const service = createMockInventoryServiceGatewayResponse();
     const partSupply = createMockInventoryPartSupplyGatewayResponse();
     const quote = createMockQuote({
@@ -34,7 +38,7 @@ describe('FindQuoteItemsCatalogUseCase', () => {
     expect(inventoryCatalogGateway.findPartsSuppliesByIds).toHaveBeenCalledWith([partSupply.id]);
   });
 
-  it('returns only the items the inventory has', async () => {
+  it('should return only the items the inventory has', async () => {
     const service = createMockInventoryServiceGatewayResponse();
     const partSupply = createMockInventoryPartSupplyGatewayResponse();
     const quote = createMockQuote({

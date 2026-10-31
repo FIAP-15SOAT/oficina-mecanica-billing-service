@@ -224,7 +224,7 @@ describe('Quote Entity', () => {
       );
     });
 
-    it('approves a SENT quote recording the author', () => {
+    it('should approve a SENT quote recording the author', () => {
       const quote = makeQuote(QuoteStatus.SENT);
       quote.approve(decidedBy);
 
@@ -235,7 +235,7 @@ describe('Quote Entity', () => {
   });
 
   describe('reject()', () => {
-    it('rejects a SENT quote recording reason and author', () => {
+    it('should reject a SENT quote recording reason and author', () => {
       const quote = makeQuote(QuoteStatus.SENT);
       quote.reject('Cliente achou caro', decidedBy);
 
@@ -284,7 +284,7 @@ describe('Quote Entity', () => {
     it.each([
       [QuoteStatus.PENDING, null],
       [QuoteStatus.SENT, new Date()],
-    ])('restores a superseded %s quote to its previous status', (status, sentAt) => {
+    ])('should restore a superseded %s quote to its previous status', (status, sentAt) => {
       const quote = makeQuote(status, { sentAt });
       quote.supersede(randomUUID());
       quote.restore();
@@ -295,7 +295,7 @@ describe('Quote Entity', () => {
       expect(quote.rejectedAt).toBeNull();
     });
 
-    it('refuses to restore a quote that was not superseded', () => {
+    it('should refuse to restore a quote that was not superseded', () => {
       const quote = makeQuote(QuoteStatus.REJECTED);
       expect(() => quote.restore()).toThrow(BusinessRuleViolationException);
     });
@@ -315,14 +315,14 @@ describe('Quote Entity', () => {
       },
     );
 
-    it('refuses to revert a quote that is not APPROVED', () => {
+    it('should refuse to revert a quote that is not APPROVED', () => {
       const quote = makeQuote(QuoteStatus.SENT);
       expect(() => quote.revertApproval('SENT')).toThrow(BusinessRuleViolationException);
     });
   });
 
   describe('ensureCanDelete()', () => {
-    it('allows deleting only a PENDING quote', () => {
+    it('should allow deleting only a PENDING quote', () => {
       expect(() => makeQuote(QuoteStatus.PENDING).ensureCanDelete()).not.toThrow();
       expect(() => makeQuote(QuoteStatus.SENT).ensureCanDelete()).toThrow(
         new BusinessRuleViolationException(

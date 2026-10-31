@@ -49,7 +49,7 @@ describe('JwtStrategy', () => {
     strategy = new JwtStrategy(configWith(CONFIG));
   });
 
-  it('returns the principal from a valid access token', () => {
+  it('should return the principal from a valid access token', () => {
     expect(strategy.validate(asVerifiedToken({}))).toEqual({
       sub: CLAIMS.sub,
       email: CLAIMS.email,
@@ -70,11 +70,11 @@ describe('JwtStrategy', () => {
     ['with a role outside the user roles', asVerifiedToken({ role: 'CUSTOMER' as UserRole })],
     ['without sub', asVerifiedToken({ sub: undefined })],
     ['without email', asVerifiedToken({ email: undefined })],
-  ])('rejects a token %s', (_case, token) => {
+  ])('should reject a token %s', (_case, token) => {
     expect(() => strategy.validate(token)).toThrow(new UnauthorizedException('Token inválido'));
   });
 
-  it('fails to start when STAFF_JWT_PUBLIC_KEY is not PEM', () => {
+  it('should fail to start when STAFF_JWT_PUBLIC_KEY is not PEM', () => {
     expect(
       () => new JwtStrategy(configWith({ ...CONFIG, STAFF_JWT_PUBLIC_KEY: 'not-a-key' })),
     ).toThrow('STAFF_JWT_PUBLIC_KEY não é uma chave pública PEM válida');
@@ -94,13 +94,13 @@ describe('JwtStrategy', () => {
       });
     }
 
-    it('authenticates a valid access token', async () => {
+    it('should authenticate a valid access token', async () => {
       await expect(authenticate(signTestStaffToken(CLAIMS))).resolves.toEqual({
         success: { sub: CLAIMS.sub, email: CLAIMS.email, role: UserRole.ADMIN },
       });
     });
 
-    it('authenticates with the configured issuer and audience', async () => {
+    it('should authenticate with the configured issuer and audience', async () => {
       strategy = new JwtStrategy(
         configWith({
           ...CONFIG,
@@ -136,11 +136,11 @@ describe('JwtStrategy', () => {
       ],
       ['with another audience', () => signTestStaffToken(CLAIMS, { audience: 'oficina-api' })],
       ['expired', () => signTestStaffToken(CLAIMS, { expiresIn: -10 })],
-    ])('fails a token %s', async (_case, token) => {
+    ])('should fail a token %s', async (_case, token) => {
       await expect(authenticate(token())).resolves.toHaveProperty('fail');
     });
 
-    it('errors with 401 a token without exp', async () => {
+    it('should error with 401 a token without exp', async () => {
       const token = sign({ ...CLAIMS, typ: 'access' }, STAFF_JWT_TEST_PRIVATE_KEY, {
         algorithm: 'RS256',
         keyid: STAFF_JWT_TEST_KEY_ID,

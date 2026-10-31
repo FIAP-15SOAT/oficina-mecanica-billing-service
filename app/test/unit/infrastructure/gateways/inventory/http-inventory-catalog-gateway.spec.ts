@@ -27,7 +27,7 @@ describe('HttpInventoryCatalogGateway', () => {
   });
 
   describe('findServicesByIds', () => {
-    it('maps the inventory response fixture to a catalog service', async () => {
+    it('should map the inventory response fixture to a catalog service', async () => {
       internalHttpClient.request.mockResolvedValue(serviceFixture);
 
       await expect(gateway.findServicesByIds([serviceFixture.data.id])).resolves.toEqual([
@@ -40,7 +40,7 @@ describe('HttpInventoryCatalogGateway', () => {
       });
     });
 
-    it('requests every id before the first answer arrives', async () => {
+    it('should request every id before the first answer arrives', async () => {
       const answers: Array<(value: unknown) => void> = [];
 
       internalHttpClient.request.mockImplementation(
@@ -54,7 +54,7 @@ describe('HttpInventoryCatalogGateway', () => {
       await expect(pending).resolves.toHaveLength(2);
     });
 
-    it('leaves out an id the inventory answers with 404', async () => {
+    it('should leave out an id the inventory answers with 404', async () => {
       internalHttpClient.request
         .mockResolvedValueOnce(serviceFixture)
         .mockRejectedValueOnce(
@@ -66,7 +66,7 @@ describe('HttpInventoryCatalogGateway', () => {
       ).resolves.toEqual([serviceFixture.data]);
     });
 
-    it('turns any other owner rejection into unavailability', async () => {
+    it('should turn any other owner rejection into unavailability', async () => {
       internalHttpClient.request.mockRejectedValue(
         new ServiceRequestRejectedException(400, 'Requisição inválida'),
       );
@@ -76,7 +76,7 @@ describe('HttpInventoryCatalogGateway', () => {
       );
     });
 
-    it('propagates unavailability', async () => {
+    it('should propagate unavailability', async () => {
       const unavailable = new ServiceIntegrationException('Serviço de destino indisponível.');
 
       internalHttpClient.request.mockRejectedValue(unavailable);
@@ -86,7 +86,7 @@ describe('HttpInventoryCatalogGateway', () => {
   });
 
   describe('findPartsSuppliesByIds', () => {
-    it('maps the inventory response fixture to a catalog part supply', async () => {
+    it('should map the inventory response fixture to a catalog part supply', async () => {
       internalHttpClient.request.mockResolvedValue(partSupplyFixture);
 
       await expect(gateway.findPartsSuppliesByIds([partSupplyFixture.data.id])).resolves.toEqual([
@@ -99,7 +99,7 @@ describe('HttpInventoryCatalogGateway', () => {
     });
   });
 
-  it('refuses to start without INVENTORY_SERVICE_URL', () => {
+  it('should refuse to start without INVENTORY_SERVICE_URL', () => {
     expect(
       () =>
         new HttpInventoryCatalogGateway(
