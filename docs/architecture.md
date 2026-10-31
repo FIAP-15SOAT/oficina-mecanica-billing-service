@@ -30,7 +30,8 @@ application/            Orquestração, livre de framework
   logging/              Catálogo de eventos de negócio (vazio até o primeiro caso de uso)
   metrics/              Catálogo de métricas de negócio (vazio até a primeira métrica)
   messaging/            Envelope das mensagens
-  ports/output/         ILogger, IMetrics, ICache, IInternalHttpClient e o principal autenticado
+  auth/                 Principal autenticado que os controllers passam aos casos de uso
+  ports/output/         services/ (ILogger, IMetrics, ICache) e gateways/ (uma pasta por serviço dono)
 interface-adapters/     Clean Controllers e Presenters (POJOs); vazia até o primeiro domínio
 infrastructure/         Framework e serviços externos
   config/               Composição da borda (app-bootstrap) e Swagger
@@ -72,7 +73,7 @@ O kit é igual ao do Work Order e dos outros serviços NestJS. O Billing usa os 
 | Outbox e relay | `infrastructure/persistence/prisma/repositories/`, `infrastructure/messaging/` | Mensagem gravada na mesma transação do estado e publicada no SNS pelo relay |
 | Consumidor | `infrastructure/messaging/` | Lê a fila `billing.fifo` e entrega cada mensagem ao handler registrado para o tipo |
 | Cache | `infrastructure/cache/` | Porta `ICache` sobre o Valkey, cache-aside que falha aberto |
-| Cliente interno | `infrastructure/clients/` | Porta `IInternalHttpClient` para as rotas `/internal` dos outros serviços |
+| Cliente interno | `infrastructure/clients/` | `InternalHttpClient`, transporte que os gateways usam para as rotas `/internal` dos outros serviços |
 | Autenticação | `infrastructure/http/{guards,strategies,decorators}/` | Guard global com o token de funcionário, `@Public()` e `@Roles()` |
 | Exceções | `infrastructure/http/filters/` | Um filtro global por camada, com corpo de erro público fixo |
 
@@ -112,7 +113,7 @@ O Billing ainda não registra handler. A filter policy da fila só roteia os tip
 
 O cache segue o [ADR 0006](adr/0006-cache-do-dono-no-elasticache.md): cache-aside no Valkey do próprio serviço, só para os dados de que o Billing é dono, com invalidação no caso de uso depois do commit. O `ValkeyCacheAdapter` roda sem fila offline, com uma tentativa e prazo de 500 ms por comando; falha de leitura vira falta (`cache.unavailable`) e falha de exclusão espera o TTL (`cache.invalidation_failed`). `CACHE_URL` é obrigatória e `CACHE_TTL_SECONDS` precisa ser inteiro maior que zero (vazio = 12 h).
 
-As chamadas a outros serviços passam pelo `IInternalHttpClient`: prazo padrão de 2 s, sem retentativa e sem redirecionamento, com `x-request-id` da requisição corrente e o `traceparent` injetado pela instrumentação HTTP. Um `4xx` do dono vira `ServiceRequestRejectedException`; prazo, erro de conexão e `5xx` viram `503`.
+As chamadas a outros serviços passam por um gateway por serviço dono (porta em `application/ports/output/gateways/<dono>/`, adaptador em `infrastructure/gateways/<dono>/`), que usa o `InternalHttpClient`: prazo padrão de 2 s, sem retentativa e sem redirecionamento, com `x-request-id` da requisição corrente e o `traceparent` injetado pela instrumentação HTTP. Um `4xx` do dono vira `ServiceRequestRejectedException`; prazo, erro de conexão e `5xx` viram `503`.
 
 ## Health checks e encerramento
 
