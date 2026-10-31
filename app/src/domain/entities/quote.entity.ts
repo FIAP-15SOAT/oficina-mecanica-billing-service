@@ -41,7 +41,6 @@ interface QuoteProps {
   approvedAt: Date | null;
   rejectedAt: Date | null;
   replacedByQuoteId: string | null;
-  previousStatus: QuoteStatus | null;
   rejectionReason: string | null;
   decidedBy: string | null;
   createdAt: Date;
@@ -63,7 +62,6 @@ export class Quote {
   approvedAt: Date | null;
   rejectedAt: Date | null;
   private _replacedByQuoteId: string | null;
-  private _previousStatus: QuoteStatus | null;
   private _rejectionReason: string | null;
   private _decidedBy: string | null;
   readonly createdAt: Date;
@@ -85,7 +83,6 @@ export class Quote {
     this.approvedAt = props.approvedAt;
     this.rejectedAt = props.rejectedAt;
     this._replacedByQuoteId = props.replacedByQuoteId;
-    this._previousStatus = props.previousStatus;
     this._rejectionReason = props.rejectionReason;
     this._decidedBy = props.decidedBy;
     this.createdAt = props.createdAt;
@@ -123,7 +120,6 @@ export class Quote {
       approvedAt: null,
       rejectedAt: null,
       replacedByQuoteId: null,
-      previousStatus: null,
       rejectionReason: null,
       decidedBy: null,
       createdAt: now,
@@ -289,7 +285,6 @@ export class Quote {
 
     const now = new Date();
 
-    this._previousStatus = this.status;
     this._replacedByQuoteId = replacedByQuoteId;
     this._status = QuoteStatus.REJECTED;
     this.rejectedAt = now;
@@ -297,14 +292,14 @@ export class Quote {
   }
 
   restore(): void {
-    if (!this._previousStatus) {
+    if (!this._replacedByQuoteId) {
       throw new BusinessRuleViolationException(
         'Só um orçamento substituído por outro pode ser restaurado',
       );
     }
 
-    this._status = this._previousStatus;
-    this._previousStatus = null;
+    // Only submit() sets sentAt and nothing goes back to PENDING, so sentAt tells which status was superseded.
+    this._status = this.sentAt ? QuoteStatus.SENT : QuoteStatus.PENDING;
     this._replacedByQuoteId = null;
     this.rejectedAt = null;
     this.updatedAt = new Date();
@@ -463,10 +458,6 @@ export class Quote {
 
   get replacedByQuoteId(): string | null {
     return this._replacedByQuoteId;
-  }
-
-  get previousStatus(): QuoteStatus | null {
-    return this._previousStatus;
   }
 
   get rejectionReason(): string | null {

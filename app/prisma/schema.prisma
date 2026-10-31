@@ -21,3 +21,70 @@ model OutboxMessage {
 
   @@map("outbox")
 }
+
+// ─── Quotes ───────────────────────────────────────────────────────────────────
+
+enum QuoteStatus {
+  PENDING
+  SENT
+  APPROVED
+  REJECTED
+}
+
+model Quote {
+  id                String       @id @default(uuid()) @db.Uuid
+  workOrderId       String       @map("work_order_id") @db.Uuid
+  servicesAmount    Decimal      @default(0) @map("services_amount") @db.Decimal(10, 2)
+  partsAmount       Decimal      @default(0) @map("parts_amount") @db.Decimal(10, 2)
+  totalAmount       Decimal      @default(0) @map("total_amount") @db.Decimal(10, 2)
+  version           Int          @default(1)
+  status            QuoteStatus  @default(PENDING)
+  notes             String?      @db.Text
+  sentAt            DateTime?    @map("sent_at")
+  approvedAt        DateTime?    @map("approved_at")
+  rejectedAt        DateTime?    @map("rejected_at")
+  replacedByQuoteId String?      @map("replaced_by_quote_id") @db.Uuid
+  rejectionReason   String?      @map("rejection_reason") @db.Text
+  decidedBy         String?      @map("decided_by") @db.Uuid
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  services      QuoteService[]
+  partsSupplies QuotePartSupply[]
+
+  @@index([workOrderId, status])
+  @@index([status])
+  @@map("quotes")
+}
+
+model QuoteService {
+  quoteId    String   @map("quote_id") @db.Uuid
+  serviceId  String   @map("service_id") @db.Uuid
+  quantity   Int      @default(1)
+  unitPrice  Decimal  @map("unit_price") @db.Decimal(10, 2)
+  totalPrice Decimal  @map("total_price") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@id([quoteId, serviceId])
+  @@index([serviceId])
+  @@map("quote_services")
+}
+
+model QuotePartSupply {
+  quoteId      String   @map("quote_id") @db.Uuid
+  partSupplyId String   @map("part_supply_id") @db.Uuid
+  quantity     Int      @default(1)
+  unitPrice    Decimal  @map("unit_price") @db.Decimal(10, 2)
+  totalPrice   Decimal  @map("total_price") @db.Decimal(10, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@id([quoteId, partSupplyId])
+  @@index([partSupplyId])
+  @@map("quote_part_supplies")
+}

@@ -16,6 +16,7 @@ function makeQuote(
     servicesAmount?: number;
     partsAmount?: number;
     totalAmount?: number;
+    sentAt?: Date | null;
     approvedAt?: Date | null;
     decidedBy?: string | null;
   },
@@ -31,11 +32,10 @@ function makeQuote(
     version: 0,
     status,
     notes: null,
-    sentAt: null,
+    sentAt: opts?.sentAt ?? null,
     approvedAt: opts?.approvedAt ?? null,
     rejectedAt: null,
     replacedByQuoteId: null,
-    previousStatus: null,
     rejectionReason: null,
     decidedBy: opts?.decidedBy ?? null,
     createdAt: now,
@@ -265,7 +265,6 @@ describe('Quote Entity', () => {
         quote.supersede(replacedByQuoteId);
 
         expect(quote.status).toBe(QuoteStatus.REJECTED);
-        expect(quote.previousStatus).toBe(status);
         expect(quote.replacedByQuoteId).toBe(replacedByQuoteId);
         expect(quote.rejectedAt).toBeInstanceOf(Date);
         expect(quote.decidedBy).toBeNull();
@@ -282,13 +281,16 @@ describe('Quote Entity', () => {
   });
 
   describe('restore()', () => {
-    it('restores a superseded quote to its previous status', () => {
-      const quote = makeQuote(QuoteStatus.SENT);
+    it.each([
+      [QuoteStatus.PENDING, null],
+      [QuoteStatus.SENT, new Date()],
+    ])('restores a superseded %s quote to its previous status', (status, sentAt) => {
+      const quote = makeQuote(status, { sentAt });
       quote.supersede(randomUUID());
       quote.restore();
 
-      expect(quote.status).toBe(QuoteStatus.SENT);
-      expect(quote.previousStatus).toBeNull();
+      expect(quote.status).toBe(status);
+      expect(quote.sentAt).toBe(sentAt);
       expect(quote.replacedByQuoteId).toBeNull();
       expect(quote.rejectedAt).toBeNull();
     });

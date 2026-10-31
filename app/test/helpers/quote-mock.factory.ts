@@ -20,7 +20,6 @@ export function createMockQuote(overrides: Partial<Quote> = {}): Quote {
     approvedAt: null,
     rejectedAt: null,
     replacedByQuoteId: null,
-    previousStatus: null,
     rejectionReason: null,
     decidedBy: null,
     createdAt: now,

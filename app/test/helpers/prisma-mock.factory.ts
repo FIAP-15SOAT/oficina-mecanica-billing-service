@@ -32,6 +32,9 @@ const createMockDelegate = (): MockDelegate => ({
 
 export type MockPrismaService = {
   outboxMessage: MockDelegate;
+  quote: MockDelegate;
+  quoteService: MockDelegate;
+  quotePartSupply: MockDelegate;
   $connect: jest.Mock;
   $disconnect: jest.Mock;
   $transaction: jest.Mock;
@@ -42,6 +45,9 @@ export type MockPrismaService = {
 export function createMockPrismaClient(): MockPrismaService {
   return {
     outboxMessage: createMockDelegate(),
+    quote: createMockDelegate(),
+    quoteService: createMockDelegate(),
+    quotePartSupply: createMockDelegate(),
     $connect: jest.fn(),
     $disconnect: jest.fn(),
     $transaction: jest
