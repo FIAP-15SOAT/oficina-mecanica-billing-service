@@ -11,6 +11,7 @@ import { IFindAllQuotesPaginatedUseCase } from '@application/ports/input/quote/f
 import { IFindWorkOrderQuotesUseCase } from '@application/ports/input/quote/find-work-order-quotes.use-case.interface';
 import { IFindWorkOrdersByIdsUseCase } from '@application/ports/input/quote/find-work-orders-by-ids.use-case.interface';
 import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
+import { ISubmitQuoteUseCase } from '@application/ports/input/quote/submit-quote.use-case.interface';
 
 import { CreateQuoteRequest } from './requests/create-quote-request';
 import { AddQuoteServiceRequest } from './requests/add-quote-service-request';
@@ -37,6 +38,7 @@ export class QuoteController {
     private readonly removeQuotePartSupplyUseCase: IRemoveQuotePartSupplyUseCase,
     private readonly updateQuoteServiceQuantityUseCase: IUpdateQuoteServiceQuantityUseCase,
     private readonly updateQuotePartSupplyQuantityUseCase: IUpdateQuotePartSupplyQuantityUseCase,
+    private readonly submitQuoteUseCase: ISubmitQuoteUseCase,
     private readonly findAllQuotesPaginatedUseCase: IFindAllQuotesPaginatedUseCase,
     private readonly findWorkOrderQuotesUseCase: IFindWorkOrderQuotesUseCase,
     private readonly findWorkOrdersByIdsUseCase: IFindWorkOrdersByIdsUseCase,
@@ -126,6 +128,10 @@ export class QuoteController {
 
   async removePartSupply(quoteId: string, partSupplyId: string): Promise<void> {
     await this.removeQuotePartSupplyUseCase.execute(quoteId, partSupplyId);
+  }
+
+  async submit(quoteId: string, sentBy: string): Promise<QuoteDataResponse> {
+    return this.toDataResponse(await this.submitQuoteUseCase.execute(quoteId, sentBy));
   }
 
   private async toDataResponse(quote: Quote): Promise<QuoteDataResponse> {

@@ -17,8 +17,9 @@ import { signTestStaffToken } from '../helpers/staff-jwt.helper';
 import { TestContext, setupTestApp, teardownTestApp } from '../helpers/test-app.helper';
 
 describe('Quote (E2E)', () => {
+  const staffId = randomUUID();
   const staffToken = signTestStaffToken({
-    sub: randomUUID(),
+    sub: staffId,
     email: 'admin@e2e.test',
     name: 'Admin E2E',
     role: 'ADMIN',
@@ -115,7 +116,7 @@ describe('Quote (E2E)', () => {
     });
 
     it.each([WorkOrderStatus.AWAITING_APPROVAL, WorkOrderStatus.REJECTED])(
-      'creates a quote for a %s work order',
+      'should create a quote for a %s work order',
       async (status) => {
         const workOrder = stubWorkOrder(stub, { status });
 
@@ -561,6 +562,117 @@ describe('Quote (E2E)', () => {
     });
   });
 
+  describe('POST /api/quotes/:id/submissions', () => {
+    async function createQuoteWithService(): Promise<{
+      id: string;
+      workOrderId: string;
+      service: { id: string; name: string; basePrice: number };
+    }> {
+      const service = stubService(stub, { basePrice: 150.5 });
+      const quote = await createQuote({ services: [{ serviceId: service.id, quantity: 2 }] });
+
+      return { ...quote, service };
+    }
+
+    function setWorkOrderStatus(workOrderId: string, status: WorkOrderStatus): void {
+      stub.workOrders.set(workOrderId, { ...stub.workOrders.get(workOrderId), status });
+    }
+
+    it('should submit a quote', async () => {
+      const { id } = await createQuoteWithService();
+
+      const res = await api.post(`/api/quotes/${id}/submissions`).expect(200);
+
+      expect(res.body.data).toEqual(expect.objectContaining({ id, status: 'SENT' }));
+    });
+
+    it('should write billing.quote.sent to the outbox', async () => {
+      const { id, workOrderId, service } = await createQuoteWithService();
+
+      await api.post(`/api/quotes/${id}/submissions`).expect(200);
+
+      const messages = await ctx.prisma.outboxMessage.findMany();
+      expect(messages).toEqual([
+        expect.objectContaining({
+          type: 'billing.quote.sent',
+          workOrderId,
+          payload: {
+            quoteId: id,
+            sentBy: staffId,
+            total: '301.00',
+            items: [{ name: service.name, quantity: 2, unitPrice: '150.50' }],
+          },
+        }),
+      ]);
+    });
+
+    it.each([WorkOrderStatus.AWAITING_APPROVAL, WorkOrderStatus.REJECTED])(
+      'should submit a quote for a %s work order',
+      async (status) => {
+        const { id, workOrderId } = await createQuoteWithService();
+        setWorkOrderStatus(workOrderId, status);
+
+        await api.post(`/api/quotes/${id}/submissions`).expect(200);
+      },
+    );
+
+    it('should return 409 when submitting quote with no items', async () => {
+      const { id } = await createQuote();
+
+      await api.post(`/api/quotes/${id}/submissions`).expect(409);
+
+      expect(await ctx.prisma.outboxMessage.count()).toBe(0);
+    });
+
+    it('should keep the quote PENDING and answer 409 for a RECEIVED work order', async () => {
+      const { id, workOrderId } = await createQuoteWithService();
+      setWorkOrderStatus(workOrderId, WorkOrderStatus.RECEIVED);
+
+      await api.post(`/api/quotes/${id}/submissions`).expect(409);
+
+      const res = await api.get(`/api/quotes/${id}`).expect(200);
+      expect(res.body.data.status).toBe('PENDING');
+      expect(await ctx.prisma.outboxMessage.count()).toBe(0);
+    });
+
+    it('should keep the quote PENDING and answer 404 when an item is no longer in the inventory', async () => {
+      const { id, service } = await createQuoteWithService();
+      stub.services.delete(service.id);
+
+      await api.post(`/api/quotes/${id}/submissions`).expect(404);
+
+      const quote = await ctx.prisma.quote.findUniqueOrThrow({ where: { id } });
+      expect(quote.status).toBe('PENDING');
+      expect(await ctx.prisma.outboxMessage.count()).toBe(0);
+    });
+
+    it('should refuse submission with 409 while the work order has an APPROVED quote', async () => {
+      const approved = await createQuoteWithService();
+      const pending = await createQuote({
+        workOrderId: approved.workOrderId,
+        services: [{ serviceId: approved.service.id, quantity: 1 }],
+      });
+      await ctx.prisma.quote.update({ where: { id: approved.id }, data: { status: 'APPROVED' } });
+
+      const res = await api.post(`/api/quotes/${pending.id}/submissions`).expect(409);
+
+      expect(res.body.message).toBe('A ordem de serviço já tem um orçamento aprovado');
+      const quote = await ctx.prisma.quote.findUniqueOrThrow({ where: { id: pending.id } });
+      expect(quote.status).toBe('PENDING');
+      expect(await ctx.prisma.outboxMessage.count()).toBe(0);
+    });
+
+    it('should accept creation again after the approved quote went back to SENT', async () => {
+      const { id, workOrderId } = await createQuoteWithService();
+      await ctx.prisma.quote.update({ where: { id }, data: { status: 'APPROVED' } });
+      await api.post('/api/quotes').send({ workOrderId }).expect(409);
+
+      await ctx.prisma.quote.update({ where: { id }, data: { status: 'SENT' } });
+
+      await api.post('/api/quotes').send({ workOrderId }).expect(201);
+    });
+  });
+
   describe('Extra Coverage Scenarios', () => {
     it('should answer 404 for the item routes of an unknown quote', async () => {
       const quoteId = randomUUID();
@@ -575,6 +687,21 @@ describe('Quote (E2E)', () => {
         .expect(404);
       await api.delete(`/api/quotes/${quoteId}/services/${randomUUID()}`).expect(404);
       await api.delete(`/api/quotes/${quoteId}/parts-supplies/${randomUUID()}`).expect(404);
+    });
+
+    it('should return 404 when submitting non-existent quote', async () => {
+      await api.post(`/api/quotes/${randomUUID()}/submissions`).expect(404);
+    });
+
+    it('should return 409 when submitting a REJECTED quote', async () => {
+      const service = stubService(stub);
+      const { id } = await createQuote({ services: [{ serviceId: service.id, quantity: 1 }] });
+      await ctx.prisma.quote.update({
+        where: { id },
+        data: { status: 'REJECTED', rejectedAt: new Date() },
+      });
+
+      await api.post(`/api/quotes/${id}/submissions`).expect(409);
     });
 
     it('should sanitize strings with null characters', async () => {

@@ -30,6 +30,8 @@ import {
 
 import { RolesGuard } from '@infrastructure/http/guards/roles.guard';
 import { Roles } from '@infrastructure/http/decorators/roles.decorator';
+import { CurrentPrincipal } from '@infrastructure/http/decorators/current-principal.decorator';
+import { AuthenticatedPrincipal } from '@application/auth/authenticated-principal';
 import { UserRole } from '@domain/enums/user-role.enum';
 
 import { QuoteController as QuoteCleanController } from '@interface-adapters/quote/quote.controller';
@@ -193,5 +195,22 @@ export class QuoteController {
     @Param('partSupplyId', ParseUUIDPipe) partSupplyId: string,
   ): Promise<void> {
     return this.controller.removePartSupply(id, partSupplyId);
+  }
+
+  @Post(':id/submissions')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN, UserRole.MECHANIC, UserRole.ATTENDANT)
+  @ApiOperation({ summary: 'Enviar orçamento para aprovação do cliente' })
+  @ApiOkResponse({ type: QuoteDataResponseDto, description: 'Orçamento enviado com sucesso' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso negado' })
+  @ApiNotFoundResponse({ description: 'Orçamento ou Ordem de Serviço não encontrada' })
+  @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
+  submit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<QuoteDataResponseDto> {
+    return this.controller.submit(id, principal.sub);
   }
 }

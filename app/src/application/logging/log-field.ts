@@ -1,4 +1,5 @@
 export type LogicalFieldName =
+  | 'quoteId'
   | 'workOrderId'
   | 'port'
   | 'signal'

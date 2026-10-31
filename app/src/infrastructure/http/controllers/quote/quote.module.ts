@@ -7,6 +7,7 @@ import { QuoteWorkOrderPolicy } from '@application/policies/quote-work-order.pol
 import { IInventoryCatalogGateway } from '@application/ports/output/gateways/inventory/inventory-catalog-gateway.interface';
 import { IWorkOrderGateway } from '@application/ports/output/gateways/work-order/work-order-gateway.interface';
 import { ICache } from '@application/ports/output/services/cache.service.interface';
+import { ILogger } from '@application/ports/output/services/logger.service.interface';
 import { QuoteItemValidator } from '@application/services/quote-item-validator';
 import { CreateQuoteUseCase } from '@application/use-cases/quote/create-quote.use-case';
 import { FindQuoteByIdUseCase } from '@application/use-cases/quote/find-quote-by-id.use-case';
@@ -20,6 +21,7 @@ import { FindAllQuotesPaginatedUseCase } from '@application/use-cases/quote/find
 import { FindWorkOrderQuotesUseCase } from '@application/use-cases/quote/find-work-order-quotes.use-case';
 import { FindWorkOrdersByIdsUseCase } from '@application/use-cases/quote/find-work-orders-by-ids.use-case';
 import { FindQuoteItemsCatalogUseCase } from '@application/use-cases/quote/find-quote-items-catalog.use-case';
+import { SubmitQuoteUseCase } from '@application/use-cases/quote/submit-quote.use-case';
 
 import { QuoteController as QuoteCleanController } from '@interface-adapters/quote/quote.controller';
 
@@ -37,6 +39,7 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
         workOrderGateway: IWorkOrderGateway,
         inventoryCatalogGateway: IInventoryCatalogGateway,
         cache: ICache,
+        logger: ILogger,
       ) => {
         const quoteWorkOrderPolicy = new QuoteWorkOrderPolicy(workOrderGateway);
 
@@ -59,6 +62,14 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
           new RemoveQuotePartSupplyUseCase(unitOfWork, cache),
           new UpdateQuoteServiceQuantityUseCase(unitOfWork, cache),
           new UpdateQuotePartSupplyQuantityUseCase(unitOfWork, cache),
+          new SubmitQuoteUseCase(
+            quoteRepository,
+            unitOfWork,
+            quoteWorkOrderPolicy,
+            inventoryCatalogGateway,
+            logger,
+            cache,
+          ),
           new FindAllQuotesPaginatedUseCase(quoteRepository),
           new FindWorkOrderQuotesUseCase(quoteRepository, cache),
           new FindWorkOrdersByIdsUseCase(workOrderGateway),
@@ -71,6 +82,7 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
         'IWorkOrderGateway',
         'IInventoryCatalogGateway',
         'ICache',
+        'ILogger',
       ],
     },
   ],

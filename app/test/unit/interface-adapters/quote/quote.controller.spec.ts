@@ -15,6 +15,7 @@ import { IFindAllQuotesPaginatedUseCase } from '@application/ports/input/quote/f
 import { IFindWorkOrderQuotesUseCase } from '@application/ports/input/quote/find-work-order-quotes.use-case.interface';
 import { IFindWorkOrdersByIdsUseCase } from '@application/ports/input/quote/find-work-orders-by-ids.use-case.interface';
 import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
+import { ISubmitQuoteUseCase } from '@application/ports/input/quote/submit-quote.use-case.interface';
 import { ServiceRequestRejectedException } from '@application/exceptions/service-request-rejected.exception';
 
 import { createMockInventoryServiceGatewayResponse } from '../../../helpers/inventory-catalog-gateway-mock.factory';
@@ -33,6 +34,7 @@ describe('QuoteController', () => {
   let removeQuotePartSupplyUseCase: jest.Mocked<IRemoveQuotePartSupplyUseCase>;
   let updateQuoteServiceQuantityUseCase: jest.Mocked<IUpdateQuoteServiceQuantityUseCase>;
   let updateQuotePartSupplyQuantityUseCase: jest.Mocked<IUpdateQuotePartSupplyQuantityUseCase>;
+  let submitQuoteUseCase: jest.Mocked<ISubmitQuoteUseCase>;
   let findAllQuotesPaginatedUseCase: jest.Mocked<IFindAllQuotesPaginatedUseCase>;
   let findWorkOrderQuotesUseCase: jest.Mocked<IFindWorkOrderQuotesUseCase>;
   let findWorkOrdersByIdsUseCase: jest.Mocked<IFindWorkOrdersByIdsUseCase>;
@@ -48,6 +50,7 @@ describe('QuoteController', () => {
     removeQuotePartSupplyUseCase = { execute: jest.fn() };
     updateQuoteServiceQuantityUseCase = { execute: jest.fn() };
     updateQuotePartSupplyQuantityUseCase = { execute: jest.fn() };
+    submitQuoteUseCase = { execute: jest.fn() };
     findAllQuotesPaginatedUseCase = { execute: jest.fn() };
     findWorkOrderQuotesUseCase = { execute: jest.fn() };
     findWorkOrdersByIdsUseCase = { execute: jest.fn().mockResolvedValue([workOrder]) };
@@ -62,6 +65,7 @@ describe('QuoteController', () => {
       removeQuotePartSupplyUseCase,
       updateQuoteServiceQuantityUseCase,
       updateQuotePartSupplyQuantityUseCase,
+      submitQuoteUseCase,
       findAllQuotesPaginatedUseCase,
       findWorkOrderQuotesUseCase,
       findWorkOrdersByIdsUseCase,
@@ -208,5 +212,14 @@ describe('QuoteController', () => {
 
     await expect(controller.removePartSupply(quote.id, 'part-id')).resolves.toBeUndefined();
     expect(removeQuotePartSupplyUseCase.execute).toHaveBeenCalledWith(quote.id, 'part-id');
+  });
+
+  it('should submit the quote on behalf of the sender and embed its work order', async () => {
+    submitQuoteUseCase.execute.mockResolvedValue(quote);
+
+    await expect(controller.submit(quote.id, 'sender-id')).resolves.toEqual(
+      QuotePresenter.toDataResponse(quote, workOrder),
+    );
+    expect(submitQuoteUseCase.execute).toHaveBeenCalledWith(quote.id, 'sender-id');
   });
 });

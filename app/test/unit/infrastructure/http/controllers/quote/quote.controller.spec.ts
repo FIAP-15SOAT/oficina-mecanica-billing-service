@@ -3,6 +3,7 @@ import { QuoteController as QuoteCleanController } from '@interface-adapters/quo
 import { QuotePresenter } from '@interface-adapters/quote/quote.presenter';
 
 import { QuoteStatus } from '@domain/enums/quote-status.enum';
+import { UserRole } from '@domain/enums/user-role.enum';
 
 import { CreateQuoteRequestDto } from '@infrastructure/http/controllers/quote/dto/requests/create-quote-request.dto';
 import { AddQuoteServiceRequestDto } from '@infrastructure/http/controllers/quote/dto/requests/add-quote-service-request.dto';
@@ -24,6 +25,7 @@ describe('QuoteController (http)', () => {
 
   beforeEach(() => {
     cleanController = new QuoteCleanController(
+      { execute: jest.fn() },
       { execute: jest.fn() },
       { execute: jest.fn() },
       { execute: jest.fn() },
@@ -115,5 +117,13 @@ describe('QuoteController (http)', () => {
       updateRequest,
     );
     expect(cleanController.removePartSupply).toHaveBeenCalledWith(quote.id, 'part-id');
+  });
+
+  it('should delegate the submission with the id of the authenticated sender', async () => {
+    const principal = { sub: 'sender-id', email: 'admin@oficina.com', role: UserRole.ADMIN };
+    jest.spyOn(cleanController, 'submit').mockResolvedValue(dataResponse);
+
+    await expect(httpController.submit(quote.id, principal)).resolves.toBe(dataResponse);
+    expect(cleanController.submit).toHaveBeenCalledWith(quote.id, 'sender-id');
   });
 });
