@@ -25,6 +25,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiProduces,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
@@ -64,6 +65,7 @@ export class QuoteController {
   @Roles(UserRole.ADMIN, UserRole.MECHANIC, UserRole.ATTENDANT)
   @ApiOperation({ summary: 'Listar orçamentos paginado' })
   @ApiOkResponse({ type: QuotePaginatedResponseDto })
+  @ApiServiceUnavailableResponse({ description: 'Work Order indisponível' })
   findAll(@Query() query: FindAllQuotesQueryDto): Promise<QuotePaginatedResponseDto> {
     return this.controller.findAll(query);
   }
@@ -75,7 +77,11 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Ordem de Serviço não encontrada' })
+  @ApiConflictResponse({
+    description: 'Ordem de Serviço fora dos status permitidos ou com orçamento aprovado',
+  })
   @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
+  @ApiServiceUnavailableResponse({ description: 'Work Order ou Inventory indisponível' })
   create(@Body() request: CreateQuoteRequestDto): Promise<QuoteDataResponseDto> {
     return this.controller.create(request);
   }
@@ -87,6 +93,7 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Orçamento não encontrado' })
+  @ApiServiceUnavailableResponse({ description: 'Work Order ou Inventory indisponível' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   findOne(@Param('id', ParseUUIDPipe) id: string): Promise<QuoteWithItemsDataResponseDto> {
     return this.controller.findOne(id);
@@ -100,7 +107,11 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Orçamento ou Serviço não encontrado' })
+  @ApiConflictResponse({
+    description: 'Orçamento fora de PENDING, serviço repetido ou modificação concorrente',
+  })
   @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
+  @ApiServiceUnavailableResponse({ description: 'Work Order ou Inventory indisponível' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   addService(
     @Param('id', ParseUUIDPipe) id: string,
@@ -117,7 +128,9 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Item não encontrado no orçamento' })
+  @ApiConflictResponse({ description: 'Orçamento fora de PENDING ou modificação concorrente' })
   @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
+  @ApiServiceUnavailableResponse({ description: 'Work Order indisponível' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   @ApiParam({ name: 'serviceId', format: 'uuid', description: 'ID do serviço' })
   updateService(
@@ -136,6 +149,7 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Item não encontrado no orçamento' })
+  @ApiConflictResponse({ description: 'Orçamento fora de PENDING ou modificação concorrente' })
   @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   @ApiParam({ name: 'serviceId', format: 'uuid', description: 'ID do serviço' })
@@ -154,7 +168,12 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Orçamento ou Peça não encontrada' })
+  @ApiConflictResponse({
+    description:
+      'Orçamento fora de PENDING ou sem serviço, peça repetida ou modificação concorrente',
+  })
   @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
+  @ApiServiceUnavailableResponse({ description: 'Work Order ou Inventory indisponível' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   addPartSupply(
     @Param('id', ParseUUIDPipe) id: string,
@@ -171,7 +190,9 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Item não encontrado no orçamento' })
+  @ApiConflictResponse({ description: 'Orçamento fora de PENDING ou modificação concorrente' })
   @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
+  @ApiServiceUnavailableResponse({ description: 'Work Order indisponível' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   @ApiParam({ name: 'partSupplyId', format: 'uuid', description: 'ID da peça/insumo' })
   updatePartSupply(
@@ -190,6 +211,7 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Item não encontrado no orçamento' })
+  @ApiConflictResponse({ description: 'Orçamento fora de PENDING ou modificação concorrente' })
   @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   @ApiParam({ name: 'partSupplyId', format: 'uuid', description: 'ID da peça/insumo' })
@@ -208,7 +230,12 @@ export class QuoteController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso negado' })
   @ApiNotFoundResponse({ description: 'Orçamento ou Ordem de Serviço não encontrada' })
+  @ApiConflictResponse({
+    description:
+      'Orçamento fora de PENDING ou sem serviço, Ordem de Serviço fora dos status permitidos, outro orçamento já aprovado ou modificação concorrente',
+  })
   @ApiUnprocessableEntityResponse({ description: 'Erro de validação ou regra de negócio' })
+  @ApiServiceUnavailableResponse({ description: 'Work Order ou Inventory indisponível' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   submit(
     @Param('id', ParseUUIDPipe) id: string,
@@ -230,6 +257,7 @@ export class QuoteController {
     description:
       'Orçamento fora de SENT, Ordem de Serviço fora de AWAITING_APPROVAL, outro orçamento já aprovado ou modificação concorrente',
   })
+  @ApiServiceUnavailableResponse({ description: 'Work Order indisponível' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,

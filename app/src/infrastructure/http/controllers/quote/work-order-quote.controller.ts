@@ -7,6 +7,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiProduces,
+  ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
 
@@ -32,6 +33,7 @@ export class WorkOrderQuoteController {
   @ApiOperation({ summary: 'Listar orçamentos de uma Ordem de Serviço' })
   @ApiOkResponse({ type: QuoteListResponseDto, description: 'Lista de orçamentos' })
   @ApiNotFoundResponse({ description: 'Ordem de Serviço não encontrada' })
+  @ApiServiceUnavailableResponse({ description: 'Work Order indisponível' })
   @ApiParam({ name: 'id', format: 'uuid' })
   findQuotes(@Param('id', ParseUUIDPipe) id: string): Promise<QuoteListResponseDto> {
     return this.controller.findWorkOrderQuotes(id);
