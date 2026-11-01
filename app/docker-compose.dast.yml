@@ -1,0 +1,16 @@
+# DAST override: the Work Order and the Inventory answer from the contract fixtures.
+services:
+  internal-stubs:
+    image: node:24-alpine
+    init: true
+    command: ["node", "/stub/internal-services-stub.mjs"]
+    environment:
+      CONTRACTS_DIR: /stub/contracts
+    volumes:
+      - ../.zap/internal-services-stub.mjs:/stub/internal-services-stub.mjs:ro
+      - ./test/contracts:/stub/contracts:ro
+
+  api:
+    environment:
+      WORK_ORDER_SERVICE_URL: http://internal-stubs:3000
+      INVENTORY_SERVICE_URL: http://internal-stubs:3000

@@ -72,7 +72,7 @@ Roda os testes unitários com cobertura e envia o `coverage/lcov.info` ao SonarQ
 | Step | O que faz |
 |---|---|
 | Par RS256 efêmero | Gera o par no job; a chave pública vai para o stack, com o `kid` `staff-dast` |
-| Stack | `docker compose up -d --build --wait` de `app/docker-compose.yml` como projeto `dast`, esperando o healthcheck da API |
+| Stack | `docker compose up -d --build --wait` de `app/docker-compose.yml` com o override `app/docker-compose.dast.yml`, como projeto `dast`, esperando o healthcheck da API |
 | OpenAPI pela porta publicada | `GET http://localhost:3002/api/docs-json`: confere a porta do Billing no host |
 | Token de teste | Assina um access token de `ADMIN` com o perfil do token do Identity (`iss`, `aud`, `typ`, `exp` de 10 min) e apaga a chave privada |
 | Scan | `zap-api-scan.py` com `-f openapi` na rede do compose, contra `http://api:3000`, com o token em toda requisição e as regras de `.zap/rules.tsv`. O scan é ativo e bloqueante |
@@ -80,6 +80,16 @@ Roda os testes unitários com cobertura e envia o `coverage/lcov.info` ao SonarQ
 | Teardown | `docker compose down -v` do projeto `dast` |
 
 O DAST não depende do Identity: o próprio job faz o papel do emissor do token. Veja o [ADR 0002](adr/0002-pipelines-ci-cd-sast-dast-com-rollback.md).
+
+O DAST também não depende do Work Order nem do Inventory. O override `app/docker-compose.dast.yml` sobe o serviço `internal-stubs` (`node:24-alpine`, rodando `.zap/internal-services-stub.mjs`, sem dependências) e aponta `WORK_ORDER_SERVICE_URL` e `INVENTORY_SERVICE_URL` da API para ele. Sem o stub, as rotas de orçamento responderiam 503 e o ZAP alertaria cada resposta 5xx. O stub lê as fixtures de `app/test/contracts/`, montadas só para leitura, e responde:
+
+| Rota | Resposta |
+|---|---|
+| `GET /internal/work-orders/:id` | `200 { data }` com a fixture do Work Order, o `id` do caminho, o status `IN_DIAGNOSIS` e sem itens |
+| `GET /internal/services/:id` e `GET /internal/parts-supplies/:id` | `200 { data }` com a fixture do Inventory e o `id` do caminho |
+| Qualquer outra | `404` com o corpo de erro público (`statusCode`, `error`, `message`) |
+
+Para conferir o stub fora do compose: `CONTRACTS_DIR=app/test/contracts node .zap/internal-services-stub.mjs` na raiz do repositório e `curl http://localhost:3000/internal/services/<id>`.
 
 ## Secrets e variables
 
