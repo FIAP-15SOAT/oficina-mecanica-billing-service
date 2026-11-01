@@ -26,8 +26,12 @@ import { ApproveQuoteUseCase } from '@application/use-cases/quote/approve-quote.
 import { RejectQuoteUseCase } from '@application/use-cases/quote/reject-quote.use-case';
 import { UpdateQuoteStatusUseCase } from '@application/use-cases/quote/update-quote-status.use-case';
 import { RevertQuoteApprovalUseCase } from '@application/use-cases/quote/revert-quote-approval.use-case';
+import { CreateInitialQuoteUseCase } from '@application/use-cases/quote/create-initial-quote.use-case';
+import { DeleteQuoteUseCase } from '@application/use-cases/quote/delete-quote.use-case';
+import { DecideQuoteUseCase } from '@application/use-cases/quote/decide-quote.use-case';
 
 import { QuoteController as QuoteCleanController } from '@interface-adapters/quote/quote.controller';
+import { InternalQuoteController as InternalQuoteCleanController } from '@interface-adapters/quote/internal-quote.controller';
 
 import { QuoteMessageHandlers } from '@infrastructure/messaging/handlers/quote-message-handlers';
 
@@ -98,6 +102,45 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
       ],
     },
     {
+      provide: InternalQuoteCleanController,
+      useFactory: (
+        unitOfWork: IUnitOfWork,
+        quoteRepository: IQuoteRepository,
+        workOrderGateway: IWorkOrderGateway,
+        inventoryCatalogGateway: IInventoryCatalogGateway,
+        cache: ICache,
+        logger: ILogger,
+      ) =>
+        new InternalQuoteCleanController(
+          new CreateInitialQuoteUseCase(
+            quoteRepository,
+            new QuoteItemValidator(inventoryCatalogGateway),
+            cache,
+          ),
+          new DeleteQuoteUseCase(quoteRepository, cache),
+          new FindQuoteByIdUseCase(quoteRepository, cache),
+          new FindWorkOrderQuotesUseCase(quoteRepository, cache),
+          new DecideQuoteUseCase(
+            new ApproveQuoteUseCase(
+              unitOfWork,
+              new QuoteWorkOrderPolicy(workOrderGateway),
+              logger,
+              cache,
+            ),
+            new RejectQuoteUseCase(unitOfWork, logger, cache),
+          ),
+          new FindQuoteItemsCatalogUseCase(inventoryCatalogGateway),
+        ),
+      inject: [
+        'IUnitOfWork',
+        'IQuoteRepository',
+        'IWorkOrderGateway',
+        'IInventoryCatalogGateway',
+        'ICache',
+        'ILogger',
+      ],
+    },
+    {
       provide: RevertQuoteApprovalUseCase,
       useFactory: (unitOfWork: IUnitOfWork, logger: ILogger, cache: ICache) =>
         new RevertQuoteApprovalUseCase(unitOfWork, logger, cache),
@@ -105,5 +148,6 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
     },
     QuoteMessageHandlers,
   ],
+  exports: [InternalQuoteCleanController],
 })
 export class QuoteModule {}

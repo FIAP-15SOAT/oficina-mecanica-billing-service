@@ -1,4 +1,5 @@
 import { QuotePresenter } from '@interface-adapters/quote/quote.presenter';
+import { QuoteStatus } from '@domain/enums/quote-status.enum';
 
 import {
   createMockInventoryPartSupplyGatewayResponse,
@@ -179,5 +180,63 @@ describe('QuotePresenter', () => {
 
     expect(response.pagination).toEqual(pagination);
     expect(response.data[0].workOrder.id).toBe(workOrder.id);
+  });
+
+  describe('internal responses', () => {
+    it('should carry the work order id, the author and the rejection reason instead of the work order', () => {
+      const quote = createMockQuote({
+        status: QuoteStatus.REJECTED,
+        rejectionReason: 'Preço elevado',
+        decidedBy: 'author-id',
+        totalAmount: 200,
+      });
+
+      const { data } = QuotePresenter.toInternalDataResponse(quote);
+
+      expect(data).toEqual({
+        id: quote.id,
+        workOrderId: quote.workOrderId,
+        status: QuoteStatus.REJECTED,
+        notes: null,
+        decidedBy: 'author-id',
+        rejectionReason: 'Preço elevado',
+        sentAt: null,
+        approvedAt: null,
+        rejectedAt: null,
+        servicesAmount: 0,
+        partsAmount: 0,
+        totalAmount: 200,
+        createdAt: quote.createdAt,
+        updatedAt: quote.updatedAt,
+      });
+    });
+
+    it('should show the items with the display fields the inventory has', () => {
+      const service = createMockInventoryServiceGatewayResponse();
+      const partSupplyItem = createMockQuotePartSupply();
+
+      const quote = createMockQuote({
+        services: [createMockQuoteService({ serviceId: service.id })],
+        partsSupplies: [partSupplyItem],
+      });
+
+      const { data } = QuotePresenter.toInternalWithItemsResponse(quote, {
+        services: [service],
+        partsSupplies: [],
+      });
+
+      expect(data).toMatchObject({ id: quote.id, workOrderId: quote.workOrderId });
+      expect(data.services[0]).toMatchObject({ id: service.id, name: service.name });
+      expect(data.partsSupplies[0]).toMatchObject({ id: partSupplyItem.partSupplyId, name: null });
+    });
+
+    it('should list the quotes without items', () => {
+      const quotes = [createMockQuote(), createMockQuote()];
+
+      const { data } = QuotePresenter.toInternalListResponse(quotes);
+
+      expect(data.map((quote) => quote.id)).toEqual(quotes.map((quote) => quote.id));
+      expect('services' in data[0]).toBe(false);
+    });
   });
 });

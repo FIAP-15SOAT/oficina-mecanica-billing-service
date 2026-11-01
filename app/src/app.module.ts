@@ -20,6 +20,7 @@ import { CacheModule } from './infrastructure/cache/cache.module';
 import { ClientsModule } from './infrastructure/clients/clients.module';
 import { GatewaysModule } from './infrastructure/gateways/gateways.module';
 import { QuoteModule } from './infrastructure/http/controllers/quote/quote.module';
+import { InternalModule } from './infrastructure/http/controllers/internal/internal.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { QuoteModule } from './infrastructure/http/controllers/quote/quote.modul
     GatewaysModule,
     HealthModule,
     QuoteModule,
+    InternalModule,
   ],
   providers: [
     {

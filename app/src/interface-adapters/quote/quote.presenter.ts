@@ -15,10 +15,17 @@ import {
   QuotePaginatedResponse,
   QuoteDataResponse,
   QuoteWithItemsDataResponse,
+  QuoteWithItemsResponse,
   QuoteServiceItemResponse,
   QuotePartSupplyItemResponse,
   QuoteWorkOrderResponse,
 } from './responses/quote.response';
+import {
+  InternalQuoteDataResponse,
+  InternalQuoteListResponse,
+  InternalQuoteResponse,
+  InternalQuoteWithItemsDataResponse,
+} from './responses/internal-quote.response';
 
 export class QuotePresenter {
   static toResponse(quote: Quote, workOrder: WorkOrderGatewayResponse): QuoteResponse {
@@ -50,20 +57,48 @@ export class QuotePresenter {
     return {
       data: {
         ...QuotePresenter.toResponse(quote, workOrder),
-        services: quote.services.map((item) =>
-          QuotePresenter.toServiceItem(
-            item,
-            catalog.services.find((service) => service.id === item.serviceId),
-          ),
-        ),
-        partsSupplies: quote.partsSupplies.map((item) =>
-          QuotePresenter.toPartSupplyItem(
-            item,
-            catalog.partsSupplies.find((partSupply) => partSupply.id === item.partSupplyId),
-          ),
-        ),
+        ...QuotePresenter.toItems(quote, catalog),
       },
     };
+  }
+
+  static toInternalResponse(quote: Quote): InternalQuoteResponse {
+    return {
+      id: quote.id,
+      workOrderId: quote.workOrderId,
+      status: quote.status,
+      notes: quote.notes,
+      decidedBy: quote.decidedBy,
+      rejectionReason: quote.rejectionReason,
+      sentAt: quote.sentAt,
+      approvedAt: quote.approvedAt,
+      rejectedAt: quote.rejectedAt,
+      servicesAmount: quote.servicesAmount,
+      partsAmount: quote.partsAmount,
+      totalAmount: quote.totalAmount,
+      createdAt: quote.createdAt,
+      updatedAt: quote.updatedAt,
+    };
+  }
+
+  static toInternalDataResponse(quote: Quote): InternalQuoteDataResponse {
+    return { data: QuotePresenter.toInternalResponse(quote) };
+  }
+
+  static toInternalWithItemsResponse(
+    quote: Quote,
+    catalog: QuoteItemsCatalog,
+  ): InternalQuoteWithItemsDataResponse {
+    return {
+      data: {
+        ...QuotePresenter.toInternalResponse(quote),
+        ...QuotePresenter.toItems(quote, catalog),
+      },
+    };
+  }
+
+  static toInternalListResponse(quotes: Quote[]): InternalQuoteListResponse {
+    return { data: quotes.map((quote) => QuotePresenter.toInternalResponse(quote)) };
   }
 
   static toListResponse(
@@ -135,6 +170,26 @@ export class QuotePresenter {
       deliveredAt: workOrder.deliveredAt,
       createdAt: workOrder.createdAt,
       updatedAt: workOrder.updatedAt,
+    };
+  }
+
+  private static toItems(
+    quote: Quote,
+    catalog: QuoteItemsCatalog,
+  ): Pick<QuoteWithItemsResponse, 'services' | 'partsSupplies'> {
+    return {
+      services: quote.services.map((item) =>
+        QuotePresenter.toServiceItem(
+          item,
+          catalog.services.find((service) => service.id === item.serviceId),
+        ),
+      ),
+      partsSupplies: quote.partsSupplies.map((item) =>
+        QuotePresenter.toPartSupplyItem(
+          item,
+          catalog.partsSupplies.find((partSupply) => partSupply.id === item.partSupplyId),
+        ),
+      ),
     };
   }
 
