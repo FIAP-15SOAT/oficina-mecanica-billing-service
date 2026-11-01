@@ -92,6 +92,7 @@ describe('HttpInventoryCatalogGateway', () => {
       await expect(gateway.findPartsSuppliesByIds([partSupplyFixture.data.id])).resolves.toEqual([
         partSupplyFixture.data,
       ]);
+
       expect(internalHttpClient.request).toHaveBeenCalledWith({
         method: 'GET',
         url: `${baseUrl}/internal/parts-supplies/${partSupplyFixture.data.id}`,

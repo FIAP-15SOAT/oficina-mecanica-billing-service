@@ -62,6 +62,7 @@ describe('AddQuoteServiceUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'unknown-id', serviceId: 'any', quantity: 1 }),
     ).rejects.toThrow(new ResourceNotFoundException('Orçamento', 'unknown-id'));
+
     expect(inventoryCatalogGateway.findServicesByIds).not.toHaveBeenCalled();
   });
 
@@ -72,6 +73,7 @@ describe('AddQuoteServiceUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', serviceId: 'unknown-id', quantity: 1 }),
     ).rejects.toThrow(new ResourceNotFoundException('Serviço', 'unknown-id'));
+
     expect(unitOfWork.executeTransaction).not.toHaveBeenCalled();
   });
 
@@ -86,6 +88,7 @@ describe('AddQuoteServiceUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', serviceId: service.id, quantity: 1 }),
     ).rejects.toThrow(BusinessRuleViolationException);
+
     expect(transactionQuoteRepository.addServiceItem).not.toHaveBeenCalled();
   });
 
@@ -100,6 +103,7 @@ describe('AddQuoteServiceUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', serviceId: service.id, quantity: 1 }),
     ).rejects.toThrow(BusinessRuleViolationException);
+
     expect(transactionQuoteRepository.addServiceItem).not.toHaveBeenCalled();
   });
 
@@ -128,6 +132,7 @@ describe('AddQuoteServiceUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', serviceId: service.id, quantity: 1 }),
     ).rejects.toThrow('version conflict');
+
     expect(cache.delete).not.toHaveBeenCalled();
   });
 });

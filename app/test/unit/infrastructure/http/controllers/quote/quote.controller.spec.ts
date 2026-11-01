@@ -46,6 +46,7 @@ describe('QuoteController (http)', () => {
 
   it('should delegate the listing with the query', async () => {
     const query: FindAllQuotesQueryDto = { page: 1, limit: 10, status: QuoteStatus.PENDING };
+
     const response = QuotePresenter.toPaginatedResponse(
       { items: [quote], pagination: { totalRecords: 1, totalPages: 1, page: 1, limit: 10 } },
       [workOrder],
@@ -84,17 +85,21 @@ describe('QuoteController (http)', () => {
     jest.spyOn(cleanController, 'removeService').mockResolvedValue(undefined);
 
     await expect(httpController.addService(quote.id, addRequest)).resolves.toBe(dataResponse);
+
     await expect(httpController.updateService(quote.id, 'service-id', updateRequest)).resolves.toBe(
       dataResponse,
     );
+
     await expect(httpController.removeService(quote.id, 'service-id')).resolves.toBeUndefined();
 
     expect(cleanController.addService).toHaveBeenCalledWith(quote.id, addRequest);
+
     expect(cleanController.updateService).toHaveBeenCalledWith(
       quote.id,
       'service-id',
       updateRequest,
     );
+
     expect(cleanController.removeService).toHaveBeenCalledWith(quote.id, 'service-id');
   });
 
@@ -107,17 +112,21 @@ describe('QuoteController (http)', () => {
     jest.spyOn(cleanController, 'removePartSupply').mockResolvedValue(undefined);
 
     await expect(httpController.addPartSupply(quote.id, addRequest)).resolves.toBe(dataResponse);
+
     await expect(httpController.updatePartSupply(quote.id, 'part-id', updateRequest)).resolves.toBe(
       dataResponse,
     );
+
     await expect(httpController.removePartSupply(quote.id, 'part-id')).resolves.toBeUndefined();
 
     expect(cleanController.addPartSupply).toHaveBeenCalledWith(quote.id, addRequest);
+
     expect(cleanController.updatePartSupply).toHaveBeenCalledWith(
       quote.id,
       'part-id',
       updateRequest,
     );
+
     expect(cleanController.removePartSupply).toHaveBeenCalledWith(quote.id, 'part-id');
   });
 
@@ -137,6 +146,7 @@ describe('QuoteController (http)', () => {
     await expect(httpController.updateStatus(quote.id, request, principal)).resolves.toBe(
       dataResponse,
     );
+
     expect(cleanController.updateStatus).toHaveBeenCalledWith(quote.id, 'decider-id', request);
   });
 });

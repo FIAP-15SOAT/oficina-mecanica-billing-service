@@ -24,6 +24,7 @@ describe('FindQuoteItemsCatalogUseCase', () => {
   it('should read services and parts in parallel', () => {
     const service = createMockInventoryServiceGatewayResponse();
     const partSupply = createMockInventoryPartSupplyGatewayResponse();
+
     const quote = createMockQuote({
       services: [createMockQuoteService({ serviceId: service.id })],
       partsSupplies: [createMockQuotePartSupply({ partSupplyId: partSupply.id })],
@@ -41,6 +42,7 @@ describe('FindQuoteItemsCatalogUseCase', () => {
   it('should return only the items the inventory has', async () => {
     const service = createMockInventoryServiceGatewayResponse();
     const partSupply = createMockInventoryPartSupplyGatewayResponse();
+
     const quote = createMockQuote({
       services: [
         createMockQuoteService({ serviceId: service.id }),

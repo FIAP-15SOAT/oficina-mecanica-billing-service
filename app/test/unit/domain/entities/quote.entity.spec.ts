@@ -108,6 +108,7 @@ describe('Quote Entity', () => {
 
     it('should create with services only and compute totals', () => {
       const svc = makeService(200);
+
       const quote = Quote.create({
         workOrderId: '550e8400-e29b-41d4-a716-446655440111',
         services: [{ ...svc, quantity: 2 }],
@@ -123,6 +124,7 @@ describe('Quote Entity', () => {
     it('should create with services and parts and compute totals once', () => {
       const svc = makeService(100);
       const part = makePartSupply(50);
+
       const quote = Quote.create({
         workOrderId: '550e8400-e29b-41d4-a716-446655440111',
         services: [{ ...svc, quantity: 1 }],
@@ -326,6 +328,7 @@ describe('Quote Entity', () => {
   describe('ensureCanDelete()', () => {
     it('should allow deleting only a PENDING quote', () => {
       expect(() => makeQuote(QuoteStatus.PENDING).ensureCanDelete()).not.toThrow();
+
       expect(() => makeQuote(QuoteStatus.SENT).ensureCanDelete()).toThrow(
         new BusinessRuleViolationException(
           'Orçamento só pode ser apagado se estiver no status PENDING. Status atual: "SENT"',
@@ -363,6 +366,7 @@ describe('Quote Entity', () => {
     it('should throw when quote has only parts and no service', () => {
       const partSupplyId = randomUUID();
       const quoteId = randomUUID();
+
       const item = QuotePartSupply.reconstitute({
         quoteId,
         partSupplyId,
@@ -372,6 +376,7 @@ describe('Quote Entity', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+
       const quote = makeQuote(QuoteStatus.PENDING, { id: quoteId, partsSupplies: [item] });
       expect(() => quote.submit()).toThrow(BusinessRuleViolationException);
     });
@@ -402,6 +407,7 @@ describe('Quote Entity', () => {
 
     it('should throw when service already added', () => {
       const service = makeService();
+
       const existing = QuoteService.reconstitute({
         quoteId: randomUUID(),
         serviceId: service.serviceId,
@@ -458,6 +464,7 @@ describe('Quote Entity', () => {
     it('should update quantity and recalculate totals', () => {
       const serviceId = randomUUID();
       const quoteId = randomUUID();
+
       const item = QuoteService.reconstitute({
         quoteId,
         serviceId,
@@ -467,6 +474,7 @@ describe('Quote Entity', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
+
       const quote = makeQuote(QuoteStatus.PENDING, { id: quoteId, services: [item] });
 
       quote.updateServiceQuantity(serviceId, 3);
@@ -513,6 +521,7 @@ describe('Quote Entity', () => {
 
     it('should throw when part supply already added', () => {
       const part = makePartSupply();
+
       const existing = QuotePartSupply.reconstitute({
         quoteId: randomUUID(),
         partSupplyId: part.partSupplyId,
@@ -535,6 +544,7 @@ describe('Quote Entity', () => {
     it('should remove the part supply and recalculate totals', () => {
       const partSupplyId = randomUUID();
       const quoteId = randomUUID();
+
       const item = QuotePartSupply.reconstitute({
         quoteId,
         partSupplyId,
@@ -568,6 +578,7 @@ describe('Quote Entity', () => {
     it('should update quantity and recalculate totals', () => {
       const partSupplyId = randomUUID();
       const quoteId = randomUUID();
+
       const item = QuotePartSupply.reconstitute({
         quoteId,
         partSupplyId,

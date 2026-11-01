@@ -91,6 +91,7 @@ describe('RemoveQuotePartSupplyUseCase', () => {
     await expect(useCase.execute('quote-id', item.partSupplyId)).rejects.toThrow(
       'version conflict',
     );
+
     expect(cache.delete).not.toHaveBeenCalled();
   });
 });

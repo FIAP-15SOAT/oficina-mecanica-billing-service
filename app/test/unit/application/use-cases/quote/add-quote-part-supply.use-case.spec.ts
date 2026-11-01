@@ -66,6 +66,7 @@ describe('AddQuotePartSupplyUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'unknown-id', partSupplyId: 'any', quantity: 1 }),
     ).rejects.toThrow(new ResourceNotFoundException('Orçamento', 'unknown-id'));
+
     expect(inventoryCatalogGateway.findPartsSuppliesByIds).not.toHaveBeenCalled();
   });
 
@@ -76,6 +77,7 @@ describe('AddQuotePartSupplyUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', partSupplyId: 'unknown-id', quantity: 1 }),
     ).rejects.toThrow(new ResourceNotFoundException('Peça/Insumo', 'unknown-id'));
+
     expect(unitOfWork.executeTransaction).not.toHaveBeenCalled();
   });
 
@@ -90,6 +92,7 @@ describe('AddQuotePartSupplyUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', partSupplyId: partSupply.id, quantity: 1 }),
     ).rejects.toThrow(BusinessRuleViolationException);
+
     expect(transactionQuoteRepository.addPartSupplyItem).not.toHaveBeenCalled();
   });
 
@@ -106,6 +109,7 @@ describe('AddQuotePartSupplyUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', partSupplyId: partSupply.id, quantity: 1 }),
     ).rejects.toThrow(BusinessRuleViolationException);
+
     expect(transactionQuoteRepository.addPartSupplyItem).not.toHaveBeenCalled();
   });
 
@@ -134,6 +138,7 @@ describe('AddQuotePartSupplyUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', partSupplyId: partSupply.id, quantity: 1 }),
     ).rejects.toThrow('version conflict');
+
     expect(cache.delete).not.toHaveBeenCalled();
   });
 });

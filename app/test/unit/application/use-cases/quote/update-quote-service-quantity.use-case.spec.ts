@@ -93,6 +93,7 @@ describe('UpdateQuoteServiceQuantityUseCase', () => {
     await expect(
       useCase.execute({ quoteId: 'quote-id', serviceId: item.serviceId, quantity: 2 }),
     ).rejects.toThrow('version conflict');
+
     expect(cache.delete).not.toHaveBeenCalled();
   });
 });

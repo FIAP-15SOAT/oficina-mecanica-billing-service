@@ -106,6 +106,7 @@ describe('QuoteController', () => {
     await expect(controller.findOne(detailed.id)).resolves.toEqual(
       QuotePresenter.toWithItemsResponse(detailed, workOrder, catalog),
     );
+
     expect(findQuoteItemsCatalogUseCase.execute).toHaveBeenCalledWith(detailed);
   });
 
@@ -224,6 +225,7 @@ describe('QuoteController', () => {
     await expect(controller.submit(quote.id, 'sender-id')).resolves.toEqual(
       QuotePresenter.toDataResponse(quote, workOrder),
     );
+
     expect(submitQuoteUseCase.execute).toHaveBeenCalledWith(quote.id, 'sender-id');
   });
 
@@ -235,6 +237,7 @@ describe('QuoteController', () => {
     await expect(controller.updateStatus(quote.id, 'decider-id', input)).resolves.toEqual(
       QuotePresenter.toDataResponse(quote, workOrder),
     );
+
     expect(updateQuoteStatusUseCase.execute).toHaveBeenCalledWith(quote.id, 'decider-id', input);
   });
 });

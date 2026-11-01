@@ -60,6 +60,7 @@ describe('RejectQuoteUseCase', () => {
     expect(result.rejectionReason).toBe('Preço acima do esperado');
     expect(result.decidedBy).toBe(decidedBy);
     expect(quoteRepository.update).toHaveBeenCalledWith(quote);
+
     expect(outboxRepository.add).toHaveBeenCalledWith({
       type: 'billing.quote.rejected',
       workOrderId: quote.workOrderId,
@@ -128,9 +129,11 @@ describe('RejectQuoteUseCase', () => {
       `billing:quote:${quote.id}`,
       `billing:work-order-quotes:${quote.workOrderId}`,
     ]);
+
     expect(outboxRepository.add.mock.invocationCallOrder[0]).toBeLessThan(
       cache.delete.mock.invocationCallOrder[0],
     );
+
     expect(logger.event).toHaveBeenCalledWith(BUSINESS_EVENTS.QUOTE_REJECTED, {
       quoteId: quote.id,
       workOrderId: quote.workOrderId,

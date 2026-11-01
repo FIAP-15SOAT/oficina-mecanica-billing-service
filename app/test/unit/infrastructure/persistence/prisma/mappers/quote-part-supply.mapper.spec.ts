@@ -6,6 +6,7 @@ import { QuotePartSupplyMapper } from '@infrastructure/persistence/prisma/mapper
 describe('QuotePartSupplyMapper', () => {
   it('should map a Prisma record to a domain entity', () => {
     const now = new Date();
+
     const record = {
       quoteId: randomUUID(),
       partSupplyId: randomUUID(),

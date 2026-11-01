@@ -77,6 +77,7 @@ describe('PrismaQuoteRepository', () => {
       const result = await repository.create(quote);
 
       expect(result.id).toBe(quote.id);
+
       expect(prisma.quote.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           id: quote.id,
@@ -129,6 +130,7 @@ describe('PrismaQuoteRepository', () => {
 
       expect(result?.services[0].serviceId).toBe(serviceId);
       expect(result?.partsSupplies[0].partSupplyId).toBe(partSupplyId);
+
       expect(prisma.quote.findUnique).toHaveBeenCalledWith({
         where: { id: quote.id },
         include: { services: true, partsSupplies: true },
@@ -151,6 +153,7 @@ describe('PrismaQuoteRepository', () => {
       const result = await repository.findByWorkOrderId(quote.workOrderId);
 
       expect(result.map((q) => q.id)).toEqual([quote.id]);
+
       expect(prisma.quote.findMany).toHaveBeenCalledWith({
         where: { workOrderId: quote.workOrderId },
         orderBy: { createdAt: 'desc' },
@@ -172,6 +175,7 @@ describe('PrismaQuoteRepository', () => {
 
       expect(result.total).toBe(11);
       expect(result.items[0].id).toBe(quote.id);
+
       expect(prisma.quote.findMany).toHaveBeenCalledWith({
         where: { workOrderId: quote.workOrderId, status: QuoteStatus.PENDING },
         orderBy: { createdAt: 'desc' },
@@ -206,6 +210,7 @@ describe('PrismaQuoteRepository', () => {
       const result = await repository.update(quote);
 
       expect(result.version).toBe(2);
+
       expect(prisma.quote.update).toHaveBeenCalledWith({
         where: { id: quote.id, version: 1 },
         data: {

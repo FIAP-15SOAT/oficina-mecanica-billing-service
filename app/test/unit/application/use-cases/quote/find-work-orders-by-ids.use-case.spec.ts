@@ -27,6 +27,7 @@ describe('FindWorkOrdersByIdsUseCase', () => {
       first,
       second,
     ]);
+
     expect(workOrderGateway.findById).toHaveBeenCalledTimes(2);
   });
 });

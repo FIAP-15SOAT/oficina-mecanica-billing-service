@@ -36,6 +36,7 @@ describe('FindQuoteByIdUseCase', () => {
     quoteRepository.findByIdWithDetails.mockResolvedValue(quote);
 
     await expect(useCase.execute(quote.id)).resolves.toBe(quote);
+
     expect(cache.set).toHaveBeenCalledWith(
       `billing:quote:${quote.id}`,
       JSON.stringify(QuoteCacheMapper.toCache(quote)),
@@ -69,6 +70,7 @@ describe('FindQuoteByIdUseCase', () => {
     await expect(useCase.execute('unknown-id')).rejects.toThrow(
       new ResourceNotFoundException('Orçamento', 'unknown-id'),
     );
+
     expect(cache.set).not.toHaveBeenCalled();
   });
 });

@@ -90,6 +90,7 @@ describe('QuoteService Entity', () => {
       entity.updateQuantity(3);
 
       expect(entity.quantity).toBe(3);
+
       expect(entity.totalPrice).toBe(600); // 3 * 200
       expect(entity.lineItem).toBeInstanceOf(LineItemPrice);
     });

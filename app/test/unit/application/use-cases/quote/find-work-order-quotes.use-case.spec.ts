@@ -37,6 +37,7 @@ describe('FindWorkOrderQuotesUseCase', () => {
     quoteRepository.findByWorkOrderId.mockResolvedValue(quotes);
 
     await expect(useCase.execute(workOrderId)).resolves.toBe(quotes);
+
     expect(cache.set).toHaveBeenCalledWith(
       `billing:work-order-quotes:${workOrderId}`,
       JSON.stringify(QuoteCacheMapper.listToCache(quotes)),

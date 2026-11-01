@@ -74,6 +74,7 @@ describe('SubmitQuoteUseCase', () => {
   it('should write billing.quote.sent with the item names read in the inventory', async () => {
     const service = createMockInventoryServiceGatewayResponse({ name: 'Troca de óleo' });
     const partSupply = createMockInventoryPartSupplyGatewayResponse({ name: 'Filtro de óleo' });
+
     const quote = Quote.create({
       workOrderId: randomUUID(),
       services: [{ serviceId: service.id, unitPrice: 120, quantity: 1 }],
@@ -88,6 +89,7 @@ describe('SubmitQuoteUseCase', () => {
 
     expect(result.status).toBe(QuoteStatus.SENT);
     expect(transactionQuoteRepository.update).toHaveBeenCalledWith(quote);
+
     expect(outboxRepository.add).toHaveBeenCalledWith({
       type: 'billing.quote.sent',
       workOrderId: quote.workOrderId,
@@ -105,6 +107,7 @@ describe('SubmitQuoteUseCase', () => {
 
   it('should format money with two decimals', async () => {
     const service = createMockInventoryServiceGatewayResponse();
+
     const quote = Quote.create({
       workOrderId: randomUUID(),
       services: [{ serviceId: service.id, unitPrice: 0.1, quantity: 3 }],
@@ -132,6 +135,7 @@ describe('SubmitQuoteUseCase', () => {
     await expect(useCase.execute('unknown-id', sentBy)).rejects.toThrow(
       new ResourceNotFoundException('Orçamento', 'unknown-id'),
     );
+
     expect(workOrderGateway.findById).not.toHaveBeenCalled();
   });
 
@@ -159,6 +163,7 @@ describe('SubmitQuoteUseCase', () => {
     await expect(useCase.execute(quote.id, sentBy)).rejects.toThrow(
       new ResourceConflictException('A ordem de serviço já tem um orçamento aprovado'),
     );
+
     expect(quoteRepository.findByWorkOrderId).toHaveBeenCalledWith(quote.workOrderId);
     expect(unitOfWork.executeTransaction).not.toHaveBeenCalled();
   });
@@ -169,6 +174,7 @@ describe('SubmitQuoteUseCase', () => {
     await expect(useCase.execute('quote-id', sentBy)).rejects.toThrow(
       BusinessRuleViolationException,
     );
+
     expect(inventoryCatalogGateway.findServicesByIds).not.toHaveBeenCalled();
   });
 
@@ -181,12 +187,14 @@ describe('SubmitQuoteUseCase', () => {
     await expect(useCase.execute('quote-id', sentBy)).rejects.toThrow(
       new ResourceNotFoundException('Serviço', item.serviceId),
     );
+
     expect(unitOfWork.executeTransaction).not.toHaveBeenCalled();
   });
 
   it('should not submit when a part supply is no longer in the inventory', async () => {
     const service = createMockInventoryServiceGatewayResponse();
     const partSupplyId = randomUUID();
+
     const quote = Quote.create({
       workOrderId: randomUUID(),
       services: [{ serviceId: service.id, unitPrice: 100, quantity: 1 }],
@@ -199,11 +207,13 @@ describe('SubmitQuoteUseCase', () => {
     await expect(useCase.execute(quote.id, sentBy)).rejects.toThrow(
       new ResourceNotFoundException('Peça/Insumo', partSupplyId),
     );
+
     expect(unitOfWork.executeTransaction).not.toHaveBeenCalled();
   });
 
   it('should refuse with 409 when the quote changed after it was read', async () => {
     const item = createMockQuoteService();
+
     const conflict = new ConcurrencyException(
       'Orçamento foi modificado por outra operação. Tente novamente',
     );
@@ -233,6 +243,7 @@ describe('SubmitQuoteUseCase', () => {
       `billing:quote:${quote.id}`,
       `billing:work-order-quotes:${quote.workOrderId}`,
     ]);
+
     expect(logger.event).toHaveBeenCalledWith(BUSINESS_EVENTS.QUOTE_SUBMITTED, {
       quoteId: quote.id,
       workOrderId: quote.workOrderId,

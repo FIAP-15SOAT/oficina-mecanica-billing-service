@@ -31,6 +31,7 @@ describe('WorkOrderQuoteController', () => {
 
   it('should delegate the work order quotes listing with the work order id', async () => {
     const workOrder = createMockWorkOrderGatewayResponse();
+
     const response = QuotePresenter.toListResponse(
       [createMockQuote({ workOrderId: workOrder.id })],
       [workOrder],

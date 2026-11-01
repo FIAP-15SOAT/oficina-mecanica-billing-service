@@ -56,6 +56,7 @@ describe('ApproveQuoteUseCase', () => {
     const quote = createMockQuote({ status: QuoteStatus.SENT });
     const pending = createMockQuote({ workOrderId: quote.workOrderId });
     const sentAt = new Date('2026-10-30T12:00:00Z');
+
     const sent = createMockQuote({
       workOrderId: quote.workOrderId,
       status: QuoteStatus.SENT,
@@ -85,6 +86,7 @@ describe('ApproveQuoteUseCase', () => {
   it('should write billing.quote.approved with items, total and author', async () => {
     const serviceId = randomUUID();
     const partSupplyId = randomUUID();
+
     const quote = Quote.create({
       workOrderId: randomUUID(),
       services: [{ serviceId, unitPrice: 0.1, quantity: 3 }],
@@ -137,6 +139,7 @@ describe('ApproveQuoteUseCase', () => {
     await useCase.execute(quote.id, decidedBy);
 
     expect(outboxRepository.add).toHaveBeenCalledTimes(1);
+
     expect(outboxRepository.add).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'billing.quote.approved' }),
     );
@@ -183,6 +186,7 @@ describe('ApproveQuoteUseCase', () => {
 
   it('should leave REJECTED quotes of the work order untouched', async () => {
     const quote = createMockQuote({ status: QuoteStatus.SENT });
+
     const rejected = createMockQuote({
       workOrderId: quote.workOrderId,
       status: QuoteStatus.REJECTED,
@@ -200,16 +204,19 @@ describe('ApproveQuoteUseCase', () => {
 
   it('should update the quotes one at a time in id order before writing the message', async () => {
     const workOrderId = randomUUID();
+
     const quote = createMockQuote({
       id: '22222222-2222-4222-8222-222222222222',
       workOrderId,
       status: QuoteStatus.SENT,
     });
+
     const higher = createMockQuote({
       id: '33333333-3333-4333-8333-333333333333',
       workOrderId,
       status: QuoteStatus.SENT,
     });
+
     const lower = createMockQuote({ id: '11111111-1111-4111-8111-111111111111', workOrderId });
     let pendingUpdates = 0;
 
@@ -231,6 +238,7 @@ describe('ApproveQuoteUseCase', () => {
       quote.id,
       higher.id,
     ]);
+
     expect(quoteRepository.update.mock.invocationCallOrder.at(-1)).toBeLessThan(
       outboxRepository.add.mock.invocationCallOrder[0],
     );
@@ -238,6 +246,7 @@ describe('ApproveQuoteUseCase', () => {
 
   it('should refuse with 409 and write no message when a quote changed after the read', async () => {
     const quote = createMockQuote({ status: QuoteStatus.SENT });
+
     const conflict = new ConcurrencyException(
       'Orçamento foi modificado por outra operação. Tente novamente',
     );
@@ -255,6 +264,7 @@ describe('ApproveQuoteUseCase', () => {
   it('should delete the keys of the quote, of each rejected quote and of the list after the commit', async () => {
     const quote = createMockQuote({ status: QuoteStatus.SENT });
     const sent = createMockQuote({ workOrderId: quote.workOrderId, status: QuoteStatus.SENT });
+
     const rejected = createMockQuote({
       workOrderId: quote.workOrderId,
       status: QuoteStatus.REJECTED,
@@ -270,9 +280,11 @@ describe('ApproveQuoteUseCase', () => {
       `billing:quote:${sent.id}`,
       `billing:work-order-quotes:${quote.workOrderId}`,
     ]);
+
     expect(outboxRepository.add.mock.invocationCallOrder[0]).toBeLessThan(
       cache.delete.mock.invocationCallOrder[0],
     );
+
     expect(logger.event).toHaveBeenCalledWith(BUSINESS_EVENTS.QUOTE_APPROVED, {
       quoteId: quote.id,
       workOrderId: quote.workOrderId,

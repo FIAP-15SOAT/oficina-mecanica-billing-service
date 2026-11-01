@@ -18,6 +18,7 @@ import { TestContext, setupTestApp, teardownTestApp } from '../helpers/test-app.
 
 describe('Quote (E2E)', () => {
   const staffId = randomUUID();
+
   const staffToken = signTestStaffToken({
     sub: staffId,
     email: 'admin@e2e.test',
@@ -57,6 +58,7 @@ describe('Quote (E2E)', () => {
 
   async function createQuote(body: object = {}): Promise<{ id: string; workOrderId: string }> {
     const workOrder = stubWorkOrder(stub);
+
     const res = await api
       .post('/api/quotes')
       .send({ workOrderId: workOrder.id, ...body })
@@ -80,6 +82,7 @@ describe('Quote (E2E)', () => {
     workOrderId?: string,
   ): Promise<{ id: string; workOrderId: string; service: { id: string } }> {
     const service = stubService(stub, { basePrice: 150.5 });
+
     const quote = await createQuote({
       ...(workOrderId && { workOrderId }),
       services: [{ serviceId: service.id, quantity: 2 }],
@@ -106,6 +109,7 @@ describe('Quote (E2E)', () => {
         privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
         publicKeyEncoding: { type: 'spki', format: 'pem' },
       }).privateKey;
+
       const customerToken = sign({ sub: randomUUID(), email: 'cliente@email.com' }, customerKey, {
         algorithm: 'RS256',
         issuer: 'oficina-customer-auth',
@@ -134,6 +138,7 @@ describe('Quote (E2E)', () => {
           totalAmount: 0,
         }),
       );
+
       expect(res.body.data.workOrder.services).toBeUndefined();
       expect(res.body.data.workOrderId).toBeUndefined();
     });
@@ -285,6 +290,7 @@ describe('Quote (E2E)', () => {
     it('should show the quote with its work order and the inventory display data', async () => {
       const service = stubService(stub, { basePrice: 100 });
       const partSupply = stubPartSupply(stub, { salePrice: 40 });
+
       const { id, workOrderId } = await createQuote({
         services: [{ serviceId: service.id, quantity: 1 }],
         partsSupplies: [{ partSupplyId: partSupply.id, quantity: 2 }],
@@ -293,9 +299,11 @@ describe('Quote (E2E)', () => {
       const res = await api.get(`/api/quotes/${id}`).expect(200);
 
       expect(res.body.data.workOrder.id).toBe(workOrderId);
+
       expect(res.body.data.services).toEqual([
         expect.objectContaining({ id: service.id, name: service.name, unitPrice: 100 }),
       ]);
+
       expect(res.body.data.partsSupplies).toEqual([
         expect.objectContaining({
           id: partSupply.id,
@@ -319,12 +327,14 @@ describe('Quote (E2E)', () => {
       expect(res.body.data.services[0]).toEqual(
         expect.objectContaining({ unitPrice: 100, totalPrice: 100 }),
       );
+
       expect(res.body.data.totalAmount).toBe(100);
     });
 
     it('should show null display fields when the inventory no longer has the item', async () => {
       const service = stubService(stub, { basePrice: 100 });
       const partSupply = stubPartSupply(stub, { salePrice: 40 });
+
       const { id } = await createQuote({
         services: [{ serviceId: service.id, quantity: 1 }],
         partsSupplies: [{ partSupplyId: partSupply.id, quantity: 1 }],
@@ -338,6 +348,7 @@ describe('Quote (E2E)', () => {
       expect(res.body.data.services[0]).toEqual(
         expect.objectContaining({ id: service.id, name: null, description: null, unitPrice: 100 }),
       );
+
       expect(res.body.data.partsSupplies[0]).toEqual(
         expect.objectContaining({
           id: partSupply.id,
@@ -490,6 +501,7 @@ describe('Quote (E2E)', () => {
     it('should answer 409 when the part supply is already in the quote', async () => {
       const service = stubService(stub);
       const partSupply = stubPartSupply(stub);
+
       const { id } = await createQuote({
         services: [{ serviceId: service.id, quantity: 1 }],
         partsSupplies: [{ partSupplyId: partSupply.id, quantity: 1 }],
@@ -506,6 +518,7 @@ describe('Quote (E2E)', () => {
     it('should update and remove items of a pending quote', async () => {
       const service = stubService(stub, { basePrice: 100 });
       const partSupply = stubPartSupply(stub, { salePrice: 10 });
+
       const { id } = await createQuote({
         services: [{ serviceId: service.id, quantity: 1 }],
         partsSupplies: [{ partSupplyId: partSupply.id, quantity: 1 }],
@@ -553,6 +566,7 @@ describe('Quote (E2E)', () => {
     it('should answer 400 when updating a part supply with quantity zero', async () => {
       const service = stubService(stub);
       const partSupply = stubPartSupply(stub);
+
       const { id } = await createQuote({
         services: [{ serviceId: service.id, quantity: 1 }],
         partsSupplies: [{ partSupplyId: partSupply.id, quantity: 1 }],
@@ -667,6 +681,7 @@ describe('Quote (E2E)', () => {
 
     it('should refuse submission with 409 while the work order has an APPROVED quote', async () => {
       const approved = await createQuoteWithService();
+
       const pending = await createQuote({
         workOrderId: approved.workOrderId,
         services: [{ serviceId: approved.service.id, quantity: 1 }],
@@ -857,6 +872,7 @@ describe('Quote (E2E)', () => {
       expect(quote).toEqual(
         expect.objectContaining({ rejectionReason: 'Preço fora do esperado', decidedBy: staffId }),
       );
+
       expect(await findOutboxMessages('billing.quote.rejected')).toEqual([
         expect.objectContaining({
           workOrderId: rejected.workOrderId,
@@ -891,6 +907,7 @@ describe('Quote (E2E)', () => {
           .expect(400);
 
         expect(res.body.message).toBe('A justificativa é obrigatória para rejeitar um orçamento');
+
         const quote = await ctx.prisma.quote.findUniqueOrThrow({ where: { id } });
         expect(quote.status).toBe('SENT');
       },
@@ -948,11 +965,13 @@ describe('Quote (E2E)', () => {
         ]);
 
         expect(responses.map(({ status }) => status).sort()).toEqual([200, 409]);
+
         expect(
           await ctx.prisma.quote.count({
             where: { workOrderId: first.workOrderId, status: 'APPROVED' },
           }),
         ).toBe(1);
+
         expect(await findOutboxMessages('billing.quote.approved')).toHaveLength(1);
       }
     });
@@ -1028,6 +1047,7 @@ describe('Quote (E2E)', () => {
         const res = await api.get('/api/quotes?page=1&limit=10').expect(200);
 
         expect(res.body.pagination).toEqual({ totalRecords: 2, totalPages: 1, page: 1, limit: 10 });
+
         expect(
           res.body.data.map((quote: { workOrder: { id: string } }) => quote.workOrder.id),
         ).toEqual(expect.arrayContaining([first.workOrderId, second.workOrderId]));

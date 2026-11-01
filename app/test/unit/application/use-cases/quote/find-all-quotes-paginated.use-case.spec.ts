@@ -23,6 +23,7 @@ describe('FindAllQuotesPaginatedUseCase', () => {
       items: quotes,
       pagination: { totalRecords: 2, totalPages: 1, page: 1, limit: 10 },
     });
+
     expect(quoteRepository.findAllPaginated).toHaveBeenCalledWith({ page: 1, limit: 10 }, {});
   });
 

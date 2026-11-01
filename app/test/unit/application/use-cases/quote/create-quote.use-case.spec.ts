@@ -88,6 +88,7 @@ describe('CreateQuoteUseCase', () => {
     await expect(
       useCase.execute({ workOrderId, services: [{ serviceId: 'unknown-id', quantity: 1 }] }),
     ).rejects.toThrow(ResourceNotFoundException);
+
     expect(quoteRepository.create).not.toHaveBeenCalled();
   });
 
@@ -108,6 +109,7 @@ describe('CreateQuoteUseCase', () => {
     await expect(useCase.execute({ workOrderId })).rejects.toThrow(
       new ResourceConflictException('A ordem de serviço já tem um orçamento aprovado'),
     );
+
     expect(quoteRepository.create).not.toHaveBeenCalled();
   });
 

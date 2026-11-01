@@ -30,6 +30,7 @@ describe('QuoteCacheMapper', () => {
 
   it('should restore a list of quotes through JSON', () => {
     const quotes = [decided, createMockQuote()];
+
     const cached = JSON.parse(JSON.stringify(QuoteCacheMapper.listToCache(quotes))) as ReturnType<
       typeof QuoteCacheMapper.listToCache
     >;

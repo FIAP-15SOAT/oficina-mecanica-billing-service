@@ -20,6 +20,7 @@ describe('QuotePresenter', () => {
     const quote = createMockQuote({ workOrderId: owner.id, totalAmount: 200 });
 
     const { data } = QuotePresenter.toDataResponse(quote, owner);
+
     const { services, partSupplies, ...summary } = owner as typeof owner & {
       services: unknown;
       partSupplies: unknown;
@@ -48,6 +49,7 @@ describe('QuotePresenter', () => {
     const service = createMockInventoryServiceGatewayResponse();
     const partSupply = createMockInventoryPartSupplyGatewayResponse();
     const workOrder = createMockWorkOrderGatewayResponse();
+
     const quote = createMockQuote({
       workOrderId: workOrder.id,
       services: [createMockQuoteService({ serviceId: service.id })],
@@ -64,6 +66,7 @@ describe('QuotePresenter', () => {
       name: service.name,
       description: service.description,
     });
+
     expect(data.partsSupplies[0]).toMatchObject({
       id: partSupply.id,
       name: partSupply.name,
@@ -79,6 +82,7 @@ describe('QuotePresenter', () => {
     const workOrder = createMockWorkOrderGatewayResponse();
     const serviceItem = createMockQuoteService();
     const partSupplyItem = createMockQuotePartSupply();
+
     const quote = createMockQuote({
       workOrderId: workOrder.id,
       services: [serviceItem],
@@ -102,6 +106,7 @@ describe('QuotePresenter', () => {
         updatedAt: serviceItem.updatedAt,
       },
     ]);
+
     expect(data.partsSupplies).toEqual([
       {
         id: partSupplyItem.partSupplyId,
@@ -124,6 +129,7 @@ describe('QuotePresenter', () => {
     const service = createMockInventoryServiceGatewayResponse({ basePrice: 999 });
     const partSupply = createMockInventoryPartSupplyGatewayResponse({ salePrice: 999 });
     const workOrder = createMockWorkOrderGatewayResponse();
+
     const quote = createMockQuote({
       workOrderId: workOrder.id,
       services: [
@@ -151,6 +157,7 @@ describe('QuotePresenter', () => {
   it('should pair each quote of a list with its own work order', () => {
     const first = createMockWorkOrderGatewayResponse();
     const second = createMockWorkOrderGatewayResponse();
+
     const quotes = [
       createMockQuote({ workOrderId: second.id }),
       createMockQuote({ workOrderId: first.id }),
