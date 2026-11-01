@@ -90,7 +90,7 @@ O agregado `Quote` guarda a OS só pelo id (`workOrderId`), os itens `QuoteServi
 
 A violação de uma regra responde 409; o ciclo de vida completo está em [API › Ciclo de vida do orçamento](api.md#ciclo-de-vida-do-orçamento) e as tabelas, em [Banco de dados](database.md).
 
-O preço vem do Inventory na inclusão: o `QuoteItemValidator` busca serviços e peças por id, em paralelo, e o item grava `basePrice` ou `salePrice`. Nome, descrição, SKU, unidade e categoria não são copiados: o Clean Controller os lê no Inventory a cada resposta, assim como o resumo da OS, lido no Work Order uma vez por OS distinta.
+O preço vem do Inventory na inclusão: o `QuoteItemValidator` busca serviços e peças por id, em paralelo, e o item grava `basePrice` ou `salePrice`. Nome, descrição, SKU, unidade e categoria não são copiados: o Clean Controller os lê no Inventory a cada resposta, assim como o resumo da OS, lido no Work Order uma vez por OS distinta. Nas rotas que gravam, essas leituras vêm antes do caso de uso: com o dono fora do ar, a rota responde 503 sem gravar nada.
 
 ## Política de status da OS
 
@@ -110,9 +110,9 @@ Enquanto o orçamento aprovado aguarda a reserva de estoque, a OS continua em `A
 
 Detalhes e alternativas no [ADR 0007](adr/0007-aprovacao-sincrona-com-irmaos-reversiveis.md).
 
-<p align="center"><img src="diagrams/quote-approval-sequence.drawio.png" alt="Diagrama de sequência UML da aprovação pelo funcionário (PATCH /api/quotes/:id): QuoteController (NestJS), AuthenticationGuard e JwtStrategy, RolesGuard, QuoteController (Clean Architecture), UpdateQuoteStatusUseCase, ApproveQuoteUseCase, QuoteWorkOrderPolicy, IWorkOrderGateway, IQuoteRepository, IOutboxRepository, ICache, OutboxRelayService e SNS. Os fragmentos alt mostram cada falha e a resposta: 401, 403, 400, 404 do orçamento, 404 e 503 do Work Order, 409 da OS fora de AWAITING_APPROVAL, 404 do orçamento excluído, 409 de outro orçamento aprovado, 409 do orçamento fora de SENT, 409 da versão no laço de update em ordem de id, falha absorvida do cache e 503 do Work Order na releitura da resposta; depois da resposta, o relay pula a rodada sem o lock e para na primeira falha do SNS" width="100%"></p>
+<p align="center"><img src="diagrams/quote-approval-sequence.drawio.png" alt="Diagrama de sequência UML da aprovação pelo funcionário (PATCH /api/quotes/:id): QuoteController (NestJS), AuthenticationGuard e JwtStrategy, RolesGuard, QuoteController (Clean Architecture), UpdateQuoteStatusUseCase, ApproveQuoteUseCase, QuoteWorkOrderPolicy, IWorkOrderGateway, IQuoteRepository, IOutboxRepository, ICache, OutboxRelayService e SNS. Antes do caso de uso, o QuoteController (Clean Architecture) lê o orçamento e o resumo da OS que vai na resposta. Os fragmentos alt mostram cada falha e a resposta: 401, 403, 400, 404 do orçamento, 404 e 503 do Work Order sem nada gravado, 404 do orçamento excluído, 404 e 503 do Work Order na política, 409 da OS fora de AWAITING_APPROVAL, 409 de outro orçamento aprovado, 409 do orçamento fora de SENT, 409 da versão no laço de update em ordem de id e falha absorvida do cache; depois da resposta, o relay pula a rodada sem o lock e para na primeira falha do SNS" width="100%"></p>
 
-O `UpdateQuoteStatusUseCase` (rota do funcionário) confere a OS em `AWAITING_APPROVAL` e delega ao `ApproveQuoteUseCase`; o `DecideQuoteUseCase` (decisão do cliente, pela rota interna) delega direto. Numa transação do Unit of Work, sem chamada HTTP no meio, o `ApproveQuoteUseCase`:
+Antes do caso de uso, o Clean Controller lê o orçamento e o resumo da OS que vai na resposta. O `UpdateQuoteStatusUseCase` (rota do funcionário) confere a OS em `AWAITING_APPROVAL` e delega ao `ApproveQuoteUseCase`; o `DecideQuoteUseCase` (decisão do cliente, pela rota interna) delega direto. Numa transação do Unit of Work, sem chamada HTTP no meio, o `ApproveQuoteUseCase`:
 
 1. lê o orçamento com os itens e os orçamentos da OS;
 2. responde 409 se outro orçamento da OS está `APPROVED`;
@@ -125,9 +125,9 @@ Depois do commit, apaga as chaves de cache dos orçamentos alterados e da lista 
 
 A rejeição exige motivo, grava o autor e publica `billing.quote.rejected` com `remainingSentCount`, a contagem dos outros orçamentos `SENT` da OS feita na mesma transação.
 
-A decisão do cliente chega pela rota interna e passa pelos mesmos casos de uso, sem consultar a OS; a resposta lê os dados de exibição dos itens no Inventory:
+A decisão do cliente chega pela rota interna e passa pelos mesmos casos de uso, sem consultar a OS; os dados de exibição dos itens da resposta são lidos no Inventory antes da decisão:
 
-<p align="center"><img src="diagrams/quote-decision-sequence.drawio.png" alt="Diagrama de sequência UML da decisão do cliente (POST /internal/quotes/:id/decisions): o Work Order chama o InternalQuoteController (NestJS), que valida id e corpo (400) e delega ao InternalQuoteController (Clean Architecture) e ao DecideQuoteUseCase. No ramo approve, o ApproveQuoteUseCase roda a mesma transação da aprovação pelo funcionário, sem consultar a OS. No ramo reject, o RejectQuoteUseCase responde 400 sem motivo, 404 sem orçamento, 409 fora de SENT e 409 na versão, grava billing.quote.rejected com remainingSentCount no outbox, faz o commit e apaga o cache com falha absorvida. A resposta lê os itens no Inventory: Inventory fora do ar responde 503" width="100%"></p>
+<p align="center"><img src="diagrams/quote-decision-sequence.drawio.png" alt="Diagrama de sequência UML da decisão do cliente (POST /internal/quotes/:id/decisions): o Work Order chama o InternalQuoteController (NestJS), que valida id e corpo (400) e delega ao InternalQuoteController (Clean Architecture). Antes da decisão, ele lê o orçamento (404) e os itens no Inventory: Inventory fora do ar responde 503 sem nada gravado. Depois delega ao DecideQuoteUseCase. No ramo approve, o ApproveQuoteUseCase roda a mesma transação da aprovação pelo funcionário, sem consultar a OS. No ramo reject, o RejectQuoteUseCase responde 400 sem motivo, 404 sem orçamento, 409 fora de SENT e 409 na versão, grava billing.quote.rejected com remainingSentCount no outbox, faz o commit e apaga o cache com falha absorvida. O presenter monta a resposta com os itens lidos antes da decisão" width="100%"></p>
 
 ## Concorrência
 
@@ -135,7 +135,8 @@ Cada escrita de `quotes` filtra pela `version` lida e a incrementa; uma escrita 
 
 - **Aprovação e reversão** gravam o orçamento e os outros orçamentos que alteram, todos com `version` e em ordem de id. Duas aprovações de orçamentos diferentes da mesma OS escrevem as mesmas linhas: a segunda falha pela versão e responde 409, e a ordem por id faz uma esperar a outra em vez de entrar em deadlock. A consulta de orçamento `APPROVED` roda sem lock (`READ COMMITTED`): quem protege a corrida é a `version`.
 - **Envio** lê o orçamento e a OS fora da transação, porque chama o Work Order e o Inventory, e grava com a `version` lida. Uma inclusão de item ou a aprovação de outro orçamento da OS depois da leitura muda a versão, e o envio responde 409.
-- **Unit of Work só onde há várias escritas ou outbox:** envio, aprovação, rejeição e reversão. Criação, itens, orçamento inicial e exclusão fazem uma escrita só e usam o repositório direto: uma leitura sem lock dentro da transação não protegeria nada a mais.
+- **Unit of Work só onde há várias escritas ou outbox:** envio, aprovação, rejeição, reversão e itens (o item e a `version` do orçamento). Criação, orçamento inicial e exclusão fazem uma escrita só e usam o repositório direto: uma leitura sem lock dentro da transação não protegeria nada a mais.
+- **Itens em corrida:** duas inclusões do mesmo item, duas remoções ou uma remoção junto com a alteração de quantidade respondem 409, como a versão velha.
 
 ## Integrações
 
@@ -148,7 +149,7 @@ Cada escrita de `quotes` filtra pela `version` lida e a incrementa; uma escrita 
 | Billing publica | Work Order | `billing.quote.sent`, `billing.quote.approved`, `billing.quote.rejected`, `billing.quote.approval_reverted` | Avisar o cliente, conduzir a Saga e decidir a OS |
 | Billing consome | Work Order | `billing.quote.revert_approval` | Desfazer a aprovação |
 
-Cada serviço chamado tem um gateway: a porta em `application/ports/output/gateways/<dono>/` (`IWorkOrderGateway` e `IInventoryCatalogGateway`, com as respostas do dono nos tipos `*GatewayResponse`) e o adaptador em `infrastructure/gateways/<dono>/` (`HttpWorkOrderGateway` e `HttpInventoryCatalogGateway`), registrados no `GatewaysModule`. As URLs vêm de `WORK_ORDER_SERVICE_URL` e `INVENTORY_SERVICE_URL`, obrigatórias: sem elas a API não sobe. O 404 do dono vira 404 do recurso, ou item sem dados de exibição na leitura; outro 4xx, prazo, erro de conexão e 5xx viram 503. O domínio nunca recebe o formato do dono: o caso de uso ou o presenter o traduz.
+Cada serviço chamado tem um gateway: a porta em `application/ports/output/gateways/<dono>/` (`IWorkOrderGateway` e `IInventoryCatalogGateway`, com as respostas do dono nos tipos `*GatewayResponse`) e o adaptador em `infrastructure/gateways/<dono>/` (`HttpWorkOrderGateway` e `HttpInventoryCatalogGateway`), registrados no `GatewaysModule`. As URLs vêm de `WORK_ORDER_SERVICE_URL` e `INVENTORY_SERVICE_URL`, obrigatórias: sem elas a API não sobe. O 404 do dono vira 404 do recurso, ou item sem dados de exibição na leitura; prazo, erro de conexão e 5xx viram 503. Outro 4xx do Work Order é repassado com o status dele; no Inventory, vira 503. O domínio nunca recebe o formato do dono: o caso de uso ou o presenter o traduz.
 
 As rotas internas do Billing ficam fora do prefixo `api`, são `@Public()` e não aparecem no Swagger; as respostas delas estão versionadas em `app/test/contracts/` ([API › Rotas internas](api.md#rotas-internas-internal)).
 

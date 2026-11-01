@@ -59,7 +59,8 @@ Além disso, um orçamento criado, enviado e rejeitado durante a reserva publica
 - Um orçamento criado entre a leitura e o commit de uma aprovação fica `PENDING`; o envio dele responde 409 pela consulta de orçamento `APPROVED`.
 - Duas rejeições simultâneas dos dois últimos orçamentos `SENT` de uma OS contam uma à outra como `SENT` e publicam `remainingSentCount = 1`: a OS não vai a `REJECTED` sozinha. Fechar essa corrida exigiria travar a OS em toda rejeição.
 - A exclusão do orçamento inicial não usa `version`: um envio em corrida com a compensação da abertura não é barrado, porque só a abertura conhece o id.
-- O orçamento inicial fica órfão se o Work Order cair entre criar o orçamento e gravar a OS; ele não aparece em nenhuma tela.
+- O orçamento inicial fica órfão se o Work Order cair entre criar o orçamento e gravar a OS e a compensação também falhar. Ele aparece em `GET /api/quotes`, e a página que o contém responde 404, porque o Work Order não conhece a OS; a recuperação é apagá-lo por `DELETE /internal/quotes/:id`.
+- A reversão é idempotente só por estado, e o comando não identifica a aprovação que reverte. Se a confirmação da mensagem falhar depois do commit e o orçamento, devolvido a `SENT`, for aprovado de novo antes da reentrega, a reentrega reverte essa segunda aprovação.
 
 ## Referências
 

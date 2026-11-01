@@ -45,7 +45,7 @@ O payload é validado antes do handler (`RevertQuoteApprovalPayloadDto`). Payloa
 
 `revertTo = SENT` é a resposta à falta de estoque: o orçamento volta a poder ser aprovado depois da reposição. `revertTo = REJECTED` encerra o orçamento.
 
-**Idempotência por estado.** O comando não tem chave própria: o handler só age sobre orçamento `APPROVED`. Uma reentrega, ou um comando repetido depois que o orçamento já saiu de `APPROVED`, encontra outro status, registra `quote.approval_revert_skipped` com o status atual e confirma a mensagem sem mudar nada nem publicar de novo; a primeira execução já gravou a resposta no outbox. Orçamento inexistente segue o mesmo caminho, sem status no log.
+**Idempotência por estado.** O comando não tem chave própria: o handler só age sobre orçamento `APPROVED`. Uma reentrega, ou um comando repetido depois que o orçamento já saiu de `APPROVED`, encontra outro status, registra `quote.approval_revert_skipped` com o status atual e confirma a mensagem sem mudar nada nem publicar de novo; a primeira execução já gravou a resposta no outbox. Orçamento inexistente segue o mesmo caminho, sem status no log. O limite: o comando não identifica a aprovação que reverte. Se a confirmação falhar depois do commit e o orçamento, devolvido a `SENT`, for aprovado de novo antes da reentrega, a reentrega encontra `APPROVED` e reverte essa nova aprovação ([ADR 0007](adr/0007-aprovacao-sincrona-com-irmaos-reversiveis.md)).
 
 ## Reversão da aprovação
 

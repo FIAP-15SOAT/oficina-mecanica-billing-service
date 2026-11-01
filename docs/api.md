@@ -29,10 +29,10 @@ Os papéis são `ADMIN`, `ATTENDANT` e `MECHANIC`.
 | POST | `/` | Criar orçamento de uma OS, com ou sem itens | ADMIN, ATTENDANT, MECHANIC | 201, 400, 404, 409, 422, 503 |
 | GET | `/:id` | Detalhar, com os itens | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 503 |
 | POST | `/:id/services` | Incluir serviço | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 409, 422, 503 |
-| PATCH | `/:id/services/:serviceId` | Alterar a quantidade de um serviço | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 409 |
+| PATCH | `/:id/services/:serviceId` | Alterar a quantidade de um serviço | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 409, 503 |
 | DELETE | `/:id/services/:serviceId` | Remover serviço | ADMIN, ATTENDANT, MECHANIC | 204, 400, 404, 409 |
 | POST | `/:id/parts-supplies` | Incluir peça ou insumo | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 409, 422, 503 |
-| PATCH | `/:id/parts-supplies/:partSupplyId` | Alterar a quantidade de uma peça | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 409 |
+| PATCH | `/:id/parts-supplies/:partSupplyId` | Alterar a quantidade de uma peça | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 409, 503 |
 | DELETE | `/:id/parts-supplies/:partSupplyId` | Remover peça | ADMIN, ATTENDANT, MECHANIC | 204, 400, 404, 409 |
 | POST | `/:id/submissions` | Enviar ao cliente para decisão | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 409, 503 |
 | PATCH | `/:id` | Aprovar ou rejeitar | ADMIN, ATTENDANT | 200, 400, 404, 409, 503 |
@@ -78,7 +78,7 @@ Falta de motivo, ou motivo só com espaços, responde **400**. Orçamento fora d
 
 O orçamento traz `id`, o resumo da OS em `workOrder`, `status`, `notes`, `sentAt`, `approvedAt`, `rejectedAt`, `servicesAmount`, `partsAmount`, `totalAmount`, `createdAt` e `updatedAt`. O detalhe acrescenta `services[]` (`id`, `name`, `description`, `quantity`, `unitPrice`, `totalPrice`) e `partsSupplies[]` (os mesmos campos mais `sku`, `partNumber`, `category` e `unit`).
 
-- `workOrder` vem do Work Order a cada leitura (número, status, cliente, veículo, responsável e datas), lido uma vez por OS distinta e em paralelo; Work Order fora do ar responde **503**.
+- `workOrder` vem do Work Order a cada leitura (número, status, cliente, veículo, responsável e datas), lido uma vez por OS distinta e em paralelo; Work Order fora do ar responde **503**. Nas rotas que gravam, a OS é lida antes da gravação, então esse 503 não deixa nada gravado.
 - Nome, descrição, SKU, unidade e categoria dos itens vêm do Inventory a cada leitura. Item que o Inventory não tem mais aparece com esses campos `null`, sem erro; Inventory fora do ar responde **503**. Preço e quantidade são sempre os do orçamento.
 
 ## Orçamentos de uma ordem de serviço
@@ -131,7 +131,7 @@ Só apaga orçamento `PENDING` (**409** fora dele) e responde **204**. Orçament
 
 ### Decisão do cliente (`POST /internal/quotes/:id/decisions`)
 
-Corpo: `action` (`approve` ou `reject`), `reason` (até 500 caracteres, obrigatório na rejeição) e `decidedBy` (UUID do cliente). Repassa aos mesmos casos de uso da rota do funcionário, **sem** consultar a OS: o Work Order já conferiu o vínculo do cliente e a OS. Orçamento fora de `SENT` ou OS com outro orçamento `APPROVED` respondem **409**. A resposta é o detalhe interno, com os itens lidos no Inventory; Inventory fora do ar responde **503**. Cada desfecho está no [diagrama da decisão do cliente](architecture.md#aprovação-síncrona).
+Corpo: `action` (`approve` ou `reject`), `reason` (até 500 caracteres, obrigatório na rejeição) e `decidedBy` (UUID do cliente). Repassa aos mesmos casos de uso da rota do funcionário, **sem** consultar a OS: o Work Order já conferiu o vínculo do cliente e a OS. Orçamento fora de `SENT` ou OS com outro orçamento `APPROVED` respondem **409**. A resposta é o detalhe interno, com os itens lidos no Inventory antes da decisão; Inventory fora do ar responde **503** e a decisão não é gravada. Cada desfecho está no [diagrama da decisão do cliente](architecture.md#aprovação-síncrona).
 
 ### Uso de item (`quote-usage`)
 
