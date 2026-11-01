@@ -42,7 +42,7 @@ export class SubmitQuoteUseCase implements ISubmitQuoteUseCase {
     const items = await this.findSentItems(quote);
 
     const submitted = await this.unitOfWork.executeTransaction(async (repos) => {
-      // The version check rejects an item change or a sibling approval made after the read.
+      // The version check rejects an item change, or another quote of the work order being approved, after the read.
       const updated = await repos.quote.update(quote);
 
       await repos.outbox.add({
