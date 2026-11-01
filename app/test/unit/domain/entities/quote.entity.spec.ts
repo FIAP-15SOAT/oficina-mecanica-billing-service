@@ -255,39 +255,41 @@ describe('Quote Entity', () => {
     });
   });
 
-  describe('supersede()', () => {
-    const replacedByQuoteId = randomUUID();
+  describe('rejectByApprovalOf()', () => {
+    const approvedQuoteId = randomUUID();
 
     it.each([QuoteStatus.PENDING, QuoteStatus.SENT])(
-      'supersedes a %s quote keeping the restore columns',
+      'should reject a %s quote keeping the id of the approved quote',
       (status) => {
         const quote = makeQuote(status);
-        quote.supersede(replacedByQuoteId);
+        quote.rejectByApprovalOf(approvedQuoteId);
 
         expect(quote.status).toBe(QuoteStatus.REJECTED);
-        expect(quote.replacedByQuoteId).toBe(replacedByQuoteId);
+        expect(quote.replacedByQuoteId).toBe(approvedQuoteId);
         expect(quote.rejectedAt).toBeInstanceOf(Date);
         expect(quote.decidedBy).toBeNull();
       },
     );
 
     it.each([QuoteStatus.APPROVED, QuoteStatus.REJECTED])(
-      'refuses to supersede a %s quote',
+      'should refuse to reject a %s quote by approval',
       (status) => {
         const quote = makeQuote(status);
-        expect(() => quote.supersede(replacedByQuoteId)).toThrow(BusinessRuleViolationException);
+        expect(() => quote.rejectByApprovalOf(approvedQuoteId)).toThrow(
+          BusinessRuleViolationException,
+        );
       },
     );
   });
 
-  describe('restore()', () => {
+  describe('undoRejectionByApproval()', () => {
     it.each([
       [QuoteStatus.PENDING, null],
       [QuoteStatus.SENT, new Date()],
-    ])('should restore a superseded %s quote to its previous status', (status, sentAt) => {
+    ])('should return a %s quote rejected by approval to its previous status', (status, sentAt) => {
       const quote = makeQuote(status, { sentAt });
-      quote.supersede(randomUUID());
-      quote.restore();
+      quote.rejectByApprovalOf(randomUUID());
+      quote.undoRejectionByApproval();
 
       expect(quote.status).toBe(status);
       expect(quote.sentAt).toBe(sentAt);
@@ -295,29 +297,29 @@ describe('Quote Entity', () => {
       expect(quote.rejectedAt).toBeNull();
     });
 
-    it('should refuse to restore a quote that was not superseded', () => {
+    it('should refuse to undo a rejection that no approval caused', () => {
       const quote = makeQuote(QuoteStatus.REJECTED);
-      expect(() => quote.restore()).toThrow(BusinessRuleViolationException);
+      expect(() => quote.undoRejectionByApproval()).toThrow(BusinessRuleViolationException);
     });
   });
 
   describe('revertApproval()', () => {
-    it.each(['SENT', 'REJECTED'] as const)(
-      'reverts an approval to %s clearing approvedAt and decidedBy',
+    it.each([QuoteStatus.SENT, QuoteStatus.REJECTED] as const)(
+      'should revert an approval to %s clearing approvedAt and decidedBy',
       (revertTo) => {
         const quote = makeQuote(QuoteStatus.APPROVED, { approvedAt: new Date(), decidedBy });
         quote.revertApproval(revertTo);
 
-        expect(quote.status).toBe(QuoteStatus[revertTo]);
+        expect(quote.status).toBe(revertTo);
         expect(quote.approvedAt).toBeNull();
         expect(quote.decidedBy).toBeNull();
-        expect(quote.rejectedAt === null).toBe(revertTo === 'SENT');
+        expect(quote.rejectedAt === null).toBe(revertTo === QuoteStatus.SENT);
       },
     );
 
     it('should refuse to revert a quote that is not APPROVED', () => {
       const quote = makeQuote(QuoteStatus.SENT);
-      expect(() => quote.revertApproval('SENT')).toThrow(BusinessRuleViolationException);
+      expect(() => quote.revertApproval(QuoteStatus.SENT)).toThrow(BusinessRuleViolationException);
     });
   });
 

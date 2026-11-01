@@ -275,37 +275,36 @@ export class Quote {
     this.updatedAt = now;
   }
 
-  // Rejected because another quote of the work order was approved; restore() undoes it.
-  supersede(replacedByQuoteId: string): void {
+  rejectByApprovalOf(approvedQuoteId: string): void {
     if (this.status !== QuoteStatus.PENDING && this.status !== QuoteStatus.SENT) {
       throw new BusinessRuleViolationException(
-        `Orçamento só pode ser substituído se estiver no status PENDING ou SENT. Status atual: "${this.status}"`,
+        `Orçamento só pode ser rejeitado pela aprovação de outro se estiver no status PENDING ou SENT. Status atual: "${this.status}"`,
       );
     }
 
     const now = new Date();
 
-    this._replacedByQuoteId = replacedByQuoteId;
+    this._replacedByQuoteId = approvedQuoteId;
     this._status = QuoteStatus.REJECTED;
     this.rejectedAt = now;
     this.updatedAt = now;
   }
 
-  restore(): void {
+  undoRejectionByApproval(): void {
     if (!this._replacedByQuoteId) {
       throw new BusinessRuleViolationException(
-        'Só um orçamento substituído por outro pode ser restaurado',
+        'Só um orçamento rejeitado pela aprovação de outro pode voltar ao status anterior',
       );
     }
 
-    // Only submit() sets sentAt and nothing goes back to PENDING, so sentAt tells which status was superseded.
+    // Only submit() sets sentAt and nothing goes back to PENDING, so sentAt tells the status before the rejection.
     this._status = this.sentAt ? QuoteStatus.SENT : QuoteStatus.PENDING;
     this._replacedByQuoteId = null;
     this.rejectedAt = null;
     this.updatedAt = new Date();
   }
 
-  revertApproval(revertTo: 'SENT' | 'REJECTED'): void {
+  revertApproval(revertTo: QuoteStatus.SENT | QuoteStatus.REJECTED): void {
     if (this.status !== QuoteStatus.APPROVED) {
       throw new BusinessRuleViolationException(
         `Só um orçamento aprovado pode ter a aprovação revertida. Status atual: "${this.status}"`,
@@ -314,12 +313,14 @@ export class Quote {
 
     const now = new Date();
 
-    this._status = QuoteStatus[revertTo];
+    this._status = revertTo;
     this.approvedAt = null;
     this._decidedBy = null;
-    if (revertTo === 'REJECTED') {
+
+    if (revertTo === QuoteStatus.REJECTED) {
       this.rejectedAt = now;
     }
+
     this.updatedAt = now;
   }
 

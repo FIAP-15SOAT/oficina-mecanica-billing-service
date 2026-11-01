@@ -80,7 +80,7 @@ export class ApproveQuoteUseCase implements IApproveQuoteUseCase {
       (other) => other.status === QuoteStatus.PENDING || other.status === QuoteStatus.SENT,
     );
 
-    openQuotes.forEach((openQuote) => openQuote.supersede(approvedQuote.id));
+    openQuotes.forEach((openQuote) => openQuote.rejectByApprovalOf(approvedQuote.id));
 
     return openQuotes;
   }

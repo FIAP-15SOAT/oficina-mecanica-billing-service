@@ -25,8 +25,11 @@ import { SubmitQuoteUseCase } from '@application/use-cases/quote/submit-quote.us
 import { ApproveQuoteUseCase } from '@application/use-cases/quote/approve-quote.use-case';
 import { RejectQuoteUseCase } from '@application/use-cases/quote/reject-quote.use-case';
 import { UpdateQuoteStatusUseCase } from '@application/use-cases/quote/update-quote-status.use-case';
+import { RevertQuoteApprovalUseCase } from '@application/use-cases/quote/revert-quote-approval.use-case';
 
 import { QuoteController as QuoteCleanController } from '@interface-adapters/quote/quote.controller';
+
+import { QuoteMessageHandlers } from '@infrastructure/messaging/handlers/quote-message-handlers';
 
 import { QuoteController } from './quote.controller';
 import { WorkOrderQuoteController } from './work-order-quote.controller';
@@ -94,6 +97,13 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
         'ILogger',
       ],
     },
+    {
+      provide: RevertQuoteApprovalUseCase,
+      useFactory: (unitOfWork: IUnitOfWork, logger: ILogger, cache: ICache) =>
+        new RevertQuoteApprovalUseCase(unitOfWork, logger, cache),
+      inject: ['IUnitOfWork', 'ILogger', 'ICache'],
+    },
+    QuoteMessageHandlers,
   ],
 })
 export class QuoteModule {}

@@ -194,7 +194,7 @@ describe('PrismaQuoteRepository', () => {
     it('should write every column guarded by the version and increment it', async () => {
       const quote = Quote.create({ workOrderId: randomUUID() });
 
-      quote.supersede(randomUUID());
+      quote.rejectByApprovalOf(randomUUID());
 
       prisma.quote.update.mockResolvedValue({
         ...toRecord(quote),
