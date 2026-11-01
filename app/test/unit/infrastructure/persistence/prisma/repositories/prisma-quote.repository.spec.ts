@@ -47,6 +47,13 @@ function itemRecord(quoteId: string) {
   };
 }
 
+function knownRequestError(code: string) {
+  return new Prisma.PrismaClientKnownRequestError('Prisma error', {
+    code,
+    clientVersion: '7.10.1',
+  });
+}
+
 describe('PrismaQuoteRepository', () => {
   let repository: PrismaQuoteRepository;
   let prisma: MockPrismaService;
@@ -293,6 +300,35 @@ describe('PrismaQuoteRepository', () => {
         data: { quantity: 2, totalPrice: 100, updatedAt: item.updatedAt },
       });
     });
+
+    it('should throw ConcurrencyException when another operation added the service first', async () => {
+      prisma.quoteService.create.mockRejectedValue(knownRequestError('P2002'));
+
+      await expect(repository.addServiceItem(item)).rejects.toThrow(ConcurrencyException);
+    });
+
+    it('should throw ConcurrencyException when another operation removed the service first', async () => {
+      prisma.quoteService.delete.mockRejectedValue(knownRequestError('P2025'));
+
+      await expect(repository.removeServiceItem(quoteId, serviceId)).rejects.toThrow(
+        ConcurrencyException,
+      );
+    });
+
+    it('should throw ConcurrencyException when the service was removed before the quantity update', async () => {
+      prisma.quoteService.update.mockRejectedValue(knownRequestError('P2025'));
+
+      await expect(repository.updateServiceItemQuantity(item)).rejects.toThrow(
+        ConcurrencyException,
+      );
+    });
+
+    it('should rethrow unexpected errors of an item write', async () => {
+      const error = knownRequestError('P2003');
+      prisma.quoteService.create.mockRejectedValue(error);
+
+      await expect(repository.addServiceItem(item)).rejects.toBe(error);
+    });
   });
 
   describe('part supply items', () => {
@@ -322,6 +358,28 @@ describe('PrismaQuoteRepository', () => {
         where: { quoteId_partSupplyId: { quoteId, partSupplyId } },
         data: { quantity: 4, totalPrice: 20, updatedAt: item.updatedAt },
       });
+    });
+
+    it('should throw ConcurrencyException when another operation added the part supply first', async () => {
+      prisma.quotePartSupply.create.mockRejectedValue(knownRequestError('P2002'));
+
+      await expect(repository.addPartSupplyItem(item)).rejects.toThrow(ConcurrencyException);
+    });
+
+    it('should throw ConcurrencyException when another operation removed the part supply first', async () => {
+      prisma.quotePartSupply.delete.mockRejectedValue(knownRequestError('P2025'));
+
+      await expect(repository.removePartSupplyItem(quoteId, partSupplyId)).rejects.toThrow(
+        ConcurrencyException,
+      );
+    });
+
+    it('should throw ConcurrencyException when the part supply was removed before the quantity update', async () => {
+      prisma.quotePartSupply.update.mockRejectedValue(knownRequestError('P2025'));
+
+      await expect(repository.updatePartSupplyItemQuantity(item)).rejects.toThrow(
+        ConcurrencyException,
+      );
     });
   });
 

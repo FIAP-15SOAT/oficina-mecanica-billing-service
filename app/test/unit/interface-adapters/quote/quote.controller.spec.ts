@@ -45,7 +45,7 @@ describe('QuoteController', () => {
 
   beforeEach(() => {
     createQuoteUseCase = { execute: jest.fn() };
-    findQuoteByIdUseCase = { execute: jest.fn() };
+    findQuoteByIdUseCase = { execute: jest.fn().mockResolvedValue(quote) };
     addQuoteServiceUseCase = { execute: jest.fn() };
     removeQuoteServiceUseCase = { execute: jest.fn() };
     addQuotePartSupplyUseCase = { execute: jest.fn() };
@@ -88,6 +88,59 @@ describe('QuoteController', () => {
 
     expect(createQuoteUseCase.execute).toHaveBeenCalledWith(input);
     expect(findWorkOrdersByIdsUseCase.execute).toHaveBeenCalledWith([workOrder.id]);
+  });
+
+  it('should not create the quote when the work order cannot be read', async () => {
+    const failure = new Error('work order service unavailable');
+
+    findWorkOrdersByIdsUseCase.execute.mockRejectedValue(failure);
+
+    await expect(controller.create({ workOrderId: workOrder.id })).rejects.toBe(failure);
+
+    expect(createQuoteUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'add a service',
+      () => controller.addService(quote.id, { serviceId: 'service-id', quantity: 2 }),
+      () => addQuoteServiceUseCase,
+    ],
+    [
+      'update the quantity of a service',
+      () => controller.updateService(quote.id, 'service-id', { quantity: 3 }),
+      () => updateQuoteServiceQuantityUseCase,
+    ],
+    [
+      'add a part supply',
+      () => controller.addPartSupply(quote.id, { partSupplyId: 'part-id', quantity: 1 }),
+      () => addQuotePartSupplyUseCase,
+    ],
+    [
+      'update the quantity of a part supply',
+      () => controller.updatePartSupply(quote.id, 'part-id', { quantity: 4 }),
+      () => updateQuotePartSupplyQuantityUseCase,
+    ],
+    ['submit the quote', () => controller.submit(quote.id, 'sender-id'), () => submitQuoteUseCase],
+    [
+      'decide the quote',
+      () =>
+        controller.updateStatus(quote.id, 'decider-id', {
+          status: QuoteStatus.REJECTED,
+          reason: 'Preço elevado',
+        }),
+      () => updateQuoteStatusUseCase,
+    ],
+  ])('should not %s when the work order of the quote cannot be read', async (_, write, useCase) => {
+    const failure = new Error('work order service unavailable');
+
+    findWorkOrdersByIdsUseCase.execute.mockRejectedValue(failure);
+
+    await expect(write()).rejects.toBe(failure);
+
+    expect(findQuoteByIdUseCase.execute).toHaveBeenCalledWith(quote.id);
+    expect(findWorkOrdersByIdsUseCase.execute).toHaveBeenCalledWith([quote.workOrderId]);
+    expect(useCase().execute).not.toHaveBeenCalled();
   });
 
   it('should show a quote with its work order and the inventory display data', async () => {

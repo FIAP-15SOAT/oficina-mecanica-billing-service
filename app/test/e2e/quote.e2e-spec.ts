@@ -450,6 +450,20 @@ describe('Quote (E2E)', () => {
         .send({ serviceId: service.id, quantity: 1 })
         .expect(409);
     });
+
+    it('should answer 409 instead of 500 when the same service is added twice at the same time', async () => {
+      for (let round = 0; round < 5; round += 1) {
+        const { id } = await createQuote();
+        const service = stubService(stub);
+
+        const responses = await Promise.all([
+          api.post(`/api/quotes/${id}/services`).send({ serviceId: service.id, quantity: 1 }),
+          api.post(`/api/quotes/${id}/services`).send({ serviceId: service.id, quantity: 1 }),
+        ]);
+
+        expect(responses.map(({ status }) => status).sort()).toEqual([200, 409]);
+      }
+    });
   });
 
   describe('POST /api/quotes/:id/parts-supplies', () => {
@@ -596,6 +610,22 @@ describe('Quote (E2E)', () => {
 
       await api.delete(`/api/quotes/${id}/services/${randomUUID()}`).expect(404);
       await api.delete(`/api/quotes/${id}/parts-supplies/${randomUUID()}`).expect(404);
+    });
+
+    it('should answer 503 and keep the quantity when the work order service fails', async () => {
+      const service = stubService(stub);
+
+      const { id, workOrderId } = await createQuote({
+        services: [{ serviceId: service.id, quantity: 1 }],
+      });
+
+      stub.failingIds.add(workOrderId);
+
+      await api.patch(`/api/quotes/${id}/services/${service.id}`).send({ quantity: 3 }).expect(503);
+
+      await expect(
+        ctx.prisma.quoteService.findFirstOrThrow({ where: { quoteId: id } }),
+      ).resolves.toMatchObject({ quantity: 1 });
     });
   });
 
@@ -937,6 +967,23 @@ describe('Quote (E2E)', () => {
         .set('Authorization', `Bearer ${mechanicToken}`)
         .send({ status: 'APPROVED' })
         .expect(403);
+    });
+
+    it('should answer 503 and save no rejection when the work order service fails', async () => {
+      const { id, workOrderId } = await createSentQuote();
+
+      stub.failingIds.add(workOrderId);
+
+      await api
+        .patch(`/api/quotes/${id}`)
+        .send({ status: 'REJECTED', reason: 'Preço elevado' })
+        .expect(503);
+
+      await expect(ctx.prisma.quote.findUniqueOrThrow({ where: { id } })).resolves.toMatchObject({
+        status: 'SENT',
+      });
+
+      expect(await findOutboxMessages('billing.quote.rejected')).toHaveLength(0);
     });
   });
 

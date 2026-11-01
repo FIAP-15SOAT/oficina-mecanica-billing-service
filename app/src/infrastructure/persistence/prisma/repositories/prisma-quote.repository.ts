@@ -22,6 +22,10 @@ import {
 
 const QUOTE_ITEMS_INCLUDE = { services: true, partsSupplies: true } as const;
 
+// Another request changed the same row first: a duplicate item insert (P2002), a stale version or
+// an item already gone (P2025).
+const CONCURRENT_CHANGE_CODES = new Set(['P2002', 'P2025']);
+
 @Injectable()
 export class PrismaQuoteRepository implements IQuoteRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -109,8 +113,8 @@ export class PrismaQuoteRepository implements IQuoteRepository {
   }
 
   async update(quote: Quote): Promise<Quote> {
-    try {
-      const record = await this.prisma.quote.update({
+    const record = await this.guardConcurrentChange(() =>
+      this.prisma.quote.update({
         where: { id: quote.id, version: quote.version },
         data: {
           servicesAmount: quote.servicesAmount,
@@ -128,17 +132,10 @@ export class PrismaQuoteRepository implements IQuoteRepository {
           version: { increment: 1 },
         },
         include: QUOTE_ITEMS_INCLUDE,
-      });
+      }),
+    );
 
-      return QuoteMapper.toDomain(record);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        throw new ConcurrencyException(
-          'Orçamento foi modificado por outra operação. Tente novamente',
-        );
-      }
-      throw error;
-    }
+    return QuoteMapper.toDomain(record);
   }
 
   async delete(id: string): Promise<void> {
@@ -146,63 +143,75 @@ export class PrismaQuoteRepository implements IQuoteRepository {
   }
 
   async addServiceItem(item: QuoteService): Promise<void> {
-    await this.prisma.quoteService.create({
-      data: {
-        quoteId: item.quoteId,
-        serviceId: item.serviceId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-      },
-    });
+    await this.guardConcurrentChange(() =>
+      this.prisma.quoteService.create({
+        data: {
+          quoteId: item.quoteId,
+          serviceId: item.serviceId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        },
+      }),
+    );
   }
 
   async removeServiceItem(quoteId: string, serviceId: string): Promise<void> {
-    await this.prisma.quoteService.delete({
-      where: { quoteId_serviceId: { quoteId, serviceId } },
-    });
+    await this.guardConcurrentChange(() =>
+      this.prisma.quoteService.delete({
+        where: { quoteId_serviceId: { quoteId, serviceId } },
+      }),
+    );
   }
 
   async updateServiceItemQuantity(item: QuoteService): Promise<void> {
-    await this.prisma.quoteService.update({
-      where: { quoteId_serviceId: { quoteId: item.quoteId, serviceId: item.serviceId } },
-      data: {
-        quantity: item.quantity,
-        totalPrice: item.totalPrice,
-        updatedAt: item.updatedAt,
-      },
-    });
+    await this.guardConcurrentChange(() =>
+      this.prisma.quoteService.update({
+        where: { quoteId_serviceId: { quoteId: item.quoteId, serviceId: item.serviceId } },
+        data: {
+          quantity: item.quantity,
+          totalPrice: item.totalPrice,
+          updatedAt: item.updatedAt,
+        },
+      }),
+    );
   }
 
   async addPartSupplyItem(item: QuotePartSupply): Promise<void> {
-    await this.prisma.quotePartSupply.create({
-      data: {
-        quoteId: item.quoteId,
-        partSupplyId: item.partSupplyId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-      },
-    });
+    await this.guardConcurrentChange(() =>
+      this.prisma.quotePartSupply.create({
+        data: {
+          quoteId: item.quoteId,
+          partSupplyId: item.partSupplyId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+        },
+      }),
+    );
   }
 
   async removePartSupplyItem(quoteId: string, partSupplyId: string): Promise<void> {
-    await this.prisma.quotePartSupply.delete({
-      where: { quoteId_partSupplyId: { quoteId, partSupplyId } },
-    });
+    await this.guardConcurrentChange(() =>
+      this.prisma.quotePartSupply.delete({
+        where: { quoteId_partSupplyId: { quoteId, partSupplyId } },
+      }),
+    );
   }
 
   async updatePartSupplyItemQuantity(item: QuotePartSupply): Promise<void> {
-    await this.prisma.quotePartSupply.update({
-      where: {
-        quoteId_partSupplyId: { quoteId: item.quoteId, partSupplyId: item.partSupplyId },
-      },
-      data: {
-        quantity: item.quantity,
-        totalPrice: item.totalPrice,
-        updatedAt: item.updatedAt,
-      },
-    });
+    await this.guardConcurrentChange(() =>
+      this.prisma.quotePartSupply.update({
+        where: {
+          quoteId_partSupplyId: { quoteId: item.quoteId, partSupplyId: item.partSupplyId },
+        },
+        data: {
+          quantity: item.quantity,
+          totalPrice: item.totalPrice,
+          updatedAt: item.updatedAt,
+        },
+      }),
+    );
   }
 
   async isServiceInUse(serviceId: string): Promise<boolean> {
@@ -211,5 +220,21 @@ export class PrismaQuoteRepository implements IQuoteRepository {
 
   async isPartSupplyInUse(partSupplyId: string): Promise<boolean> {
     return existsBy(this.prisma.quotePartSupply, { partSupplyId });
+  }
+
+  private async guardConcurrentChange<T>(write: () => Promise<T>): Promise<T> {
+    try {
+      return await write();
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        CONCURRENT_CHANGE_CODES.has(error.code)
+      ) {
+        throw new ConcurrencyException(
+          'Orçamento foi modificado por outra operação. Tente novamente',
+        );
+      }
+      throw error;
+    }
   }
 }

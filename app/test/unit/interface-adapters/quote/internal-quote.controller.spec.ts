@@ -107,19 +107,34 @@ describe('InternalQuoteController', () => {
     expect(findWorkOrderQuotesUseCase.execute).toHaveBeenCalledWith(quote.workOrderId);
   });
 
-  it('should decide a quote and answer with the detail and its items', async () => {
+  it('should read the items before deciding and answer with the decided quote', async () => {
+    const sent = createMockQuote({ status: QuoteStatus.SENT });
     const approved = createMockQuote({ status: QuoteStatus.APPROVED });
     const catalog = { services: [], partsSupplies: [] };
     const input = { action: QuoteDecisionAction.APPROVE, decidedBy: randomUUID() };
 
-    decideQuoteUseCase.execute.mockResolvedValue(approved);
+    findQuoteByIdUseCase.execute.mockResolvedValue(sent);
     findQuoteItemsCatalogUseCase.execute.mockResolvedValue(catalog);
+    decideQuoteUseCase.execute.mockResolvedValue(approved);
 
-    await expect(controller.decide(approved.id, input)).resolves.toEqual(
+    await expect(controller.decide(sent.id, input)).resolves.toEqual(
       QuotePresenter.toInternalWithItemsResponse(approved, catalog),
     );
 
-    expect(decideQuoteUseCase.execute).toHaveBeenCalledWith(approved.id, input);
+    expect(findQuoteItemsCatalogUseCase.execute).toHaveBeenCalledWith(sent);
+    expect(decideQuoteUseCase.execute).toHaveBeenCalledWith(sent.id, input);
+  });
+
+  it('should not decide the quote when the inventory cannot be read', async () => {
+    const failure = new Error('inventory service unavailable');
+    const input = { action: QuoteDecisionAction.APPROVE, decidedBy: randomUUID() };
+
+    findQuoteByIdUseCase.execute.mockResolvedValue(createMockQuote({ status: QuoteStatus.SENT }));
+    findQuoteItemsCatalogUseCase.execute.mockRejectedValue(failure);
+
+    await expect(controller.decide('quote-id', input)).rejects.toBe(failure);
+
+    expect(decideQuoteUseCase.execute).not.toHaveBeenCalled();
   });
 
   it('should answer whether a quote uses the service', async () => {

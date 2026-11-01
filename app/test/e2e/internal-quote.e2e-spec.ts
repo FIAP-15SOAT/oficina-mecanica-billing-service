@@ -278,6 +278,26 @@ describe('Internal quote routes (E2E)', () => {
 
       expect(res.body.message).toEqual(['O autor da decisão deve ser um UUID válido']);
     });
+
+    it('should answer 503 and save no decision when the inventory fails', async () => {
+      const quote = await createInitialQuote();
+
+      const item = await ctx.prisma.quoteService.findFirstOrThrow({ where: { quoteId: quote.id } });
+
+      stub.failingIds.add(item.serviceId);
+      await markSent(quote.id);
+
+      await request(httpServer)
+        .post(`/internal/quotes/${quote.id}/decisions`)
+        .send({ action: 'approve', decidedBy: randomUUID() })
+        .expect(503);
+
+      await expect(
+        ctx.prisma.quote.findUniqueOrThrow({ where: { id: quote.id } }),
+      ).resolves.toMatchObject({ status: 'SENT' });
+
+      await expect(ctx.prisma.outboxMessage.count()).resolves.toBe(0);
+    });
   });
 
   describe('GET /internal/{services,parts-supplies}/:id/quote-usage', () => {

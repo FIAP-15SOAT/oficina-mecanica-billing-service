@@ -1,4 +1,3 @@
-import { Quote } from '@domain/entities/quote.entity';
 import { ICreateQuoteUseCase } from '@application/ports/input/quote/create-quote.use-case.interface';
 import { IFindQuoteByIdUseCase } from '@application/ports/input/quote/find-quote-by-id.use-case.interface';
 import { IAddQuoteServiceUseCase } from '@application/ports/input/quote/add-quote-service.use-case.interface';
@@ -13,6 +12,7 @@ import { IFindWorkOrdersByIdsUseCase } from '@application/ports/input/quote/find
 import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
 import { ISubmitQuoteUseCase } from '@application/ports/input/quote/submit-quote.use-case.interface';
 import { IUpdateQuoteStatusUseCase } from '@application/ports/input/quote/update-quote-status.use-case.interface';
+import { WorkOrderGatewayResponse } from '@application/ports/output/gateways/work-order/work-order-gateway.response';
 
 import { CreateQuoteRequest } from './requests/create-quote-request';
 import { AddQuoteServiceRequest } from './requests/add-quote-service-request';
@@ -72,7 +72,11 @@ export class QuoteController {
   }
 
   async create(input: CreateQuoteRequest): Promise<QuoteDataResponse> {
-    return this.toDataResponse(await this.createQuoteUseCase.execute(input));
+    // Read before the write, like every write below: an unavailable work order service fails the
+    // request with nothing saved.
+    const [workOrder] = await this.findWorkOrdersByIdsUseCase.execute([input.workOrderId]);
+
+    return QuotePresenter.toDataResponse(await this.createQuoteUseCase.execute(input), workOrder);
   }
 
   async findOne(id: string): Promise<QuoteWithItemsDataResponse> {
@@ -87,7 +91,11 @@ export class QuoteController {
   }
 
   async addService(quoteId: string, input: AddQuoteServiceRequest): Promise<QuoteDataResponse> {
-    return this.toDataResponse(await this.addQuoteServiceUseCase.execute({ quoteId, ...input }));
+    const workOrder = await this.findQuoteWorkOrder(quoteId);
+
+    const quote = await this.addQuoteServiceUseCase.execute({ quoteId, ...input });
+
+    return QuotePresenter.toDataResponse(quote, workOrder);
   }
 
   async updateService(
@@ -95,13 +103,15 @@ export class QuoteController {
     serviceId: string,
     input: UpdateQuoteServiceItemRequest,
   ): Promise<QuoteDataResponse> {
+    const workOrder = await this.findQuoteWorkOrder(quoteId);
+
     const quote = await this.updateQuoteServiceQuantityUseCase.execute({
       quoteId,
       serviceId,
       ...input,
     });
 
-    return this.toDataResponse(quote);
+    return QuotePresenter.toDataResponse(quote, workOrder);
   }
 
   async removeService(quoteId: string, serviceId: string): Promise<void> {
@@ -112,7 +122,11 @@ export class QuoteController {
     quoteId: string,
     input: AddQuotePartSupplyRequest,
   ): Promise<QuoteDataResponse> {
-    return this.toDataResponse(await this.addQuotePartSupplyUseCase.execute({ quoteId, ...input }));
+    const workOrder = await this.findQuoteWorkOrder(quoteId);
+
+    const quote = await this.addQuotePartSupplyUseCase.execute({ quoteId, ...input });
+
+    return QuotePresenter.toDataResponse(quote, workOrder);
   }
 
   async updatePartSupply(
@@ -120,13 +134,15 @@ export class QuoteController {
     partSupplyId: string,
     input: UpdateQuotePartSupplyItemRequest,
   ): Promise<QuoteDataResponse> {
+    const workOrder = await this.findQuoteWorkOrder(quoteId);
+
     const quote = await this.updateQuotePartSupplyQuantityUseCase.execute({
       quoteId,
       partSupplyId,
       ...input,
     });
 
-    return this.toDataResponse(quote);
+    return QuotePresenter.toDataResponse(quote, workOrder);
   }
 
   async removePartSupply(quoteId: string, partSupplyId: string): Promise<void> {
@@ -134,7 +150,11 @@ export class QuoteController {
   }
 
   async submit(quoteId: string, sentBy: string): Promise<QuoteDataResponse> {
-    return this.toDataResponse(await this.submitQuoteUseCase.execute(quoteId, sentBy));
+    const workOrder = await this.findQuoteWorkOrder(quoteId);
+
+    const quote = await this.submitQuoteUseCase.execute(quoteId, sentBy);
+
+    return QuotePresenter.toDataResponse(quote, workOrder);
   }
 
   async updateStatus(
@@ -142,14 +162,20 @@ export class QuoteController {
     decidedBy: string,
     input: UpdateQuoteStatusRequest,
   ): Promise<QuoteDataResponse> {
-    return this.toDataResponse(
-      await this.updateQuoteStatusUseCase.execute(quoteId, decidedBy, input),
-    );
-  }
+    const workOrder = await this.findQuoteWorkOrder(quoteId);
 
-  private async toDataResponse(quote: Quote): Promise<QuoteDataResponse> {
-    const [workOrder] = await this.findWorkOrdersByIdsUseCase.execute([quote.workOrderId]);
+    const quote = await this.updateQuoteStatusUseCase.execute(quoteId, decidedBy, input);
 
     return QuotePresenter.toDataResponse(quote, workOrder);
+  }
+
+  // The billing never changes the work order synchronously, so the summary read before the write
+  // is still the one to show after it.
+  private async findQuoteWorkOrder(quoteId: string): Promise<WorkOrderGatewayResponse> {
+    const quote = await this.findQuoteByIdUseCase.execute(quoteId);
+
+    const [workOrder] = await this.findWorkOrdersByIdsUseCase.execute([quote.workOrderId]);
+
+    return workOrder;
   }
 }

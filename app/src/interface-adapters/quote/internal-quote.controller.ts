@@ -54,7 +54,15 @@ export class InternalQuoteController {
   }
 
   async decide(id: string, input: DecideQuoteRequest): Promise<InternalQuoteWithItemsDataResponse> {
-    return this.toWithItemsResponse(await this.decideQuoteUseCase.execute(id, input));
+    // Read before the decision, so an unavailable inventory fails it with nothing saved; only a
+    // SENT quote can be decided, and its items no longer change.
+    const catalog = await this.findQuoteItemsCatalogUseCase.execute(
+      await this.findQuoteByIdUseCase.execute(id),
+    );
+
+    const quote = await this.decideQuoteUseCase.execute(id, input);
+
+    return QuotePresenter.toInternalWithItemsResponse(quote, catalog);
   }
 
   async findServiceQuoteUsage(serviceId: string): Promise<InternalQuoteUsageDataResponse> {
