@@ -7,6 +7,8 @@
 - [E2E](#e2e)
 - [Rotas de teste nos E2E](#rotas-de-teste-nos-e2e)
 - [Token de funcionário nos testes](#token-de-funcionário-nos-testes)
+- [Stub do Work Order e do Inventory](#stub-do-work-order-e-do-inventory)
+- [Contratos com outros serviços](#contratos-com-outros-serviços)
 - [Mensageria no E2E](#mensageria-no-e2e)
 - [Telemetria: o que o Jest não instrumenta](#telemetria-o-que-o-jest-não-instrumenta)
 - [Postman / Newman](#postman--newman)
@@ -26,7 +28,7 @@ npm run test:cov
 
 Os scripts rodam o Jest como `node --experimental-vm-modules node_modules/jest/bin/jest.js`, nunca `npx jest`: os pacotes do NestJS 12 são só ESM, e sem a flag as suítes que importam `@nestjs/*` falham com `Must use import to load ES Module`. Para um arquivo só: `npm test -- <caminho>`.
 
-São 59 suítes e 828 testes em `test/unit/`, que espelha `src/`. Cada classe é instanciada direto, com mocks tipados das factories de `test/helpers/` (`createMockLogger()`, `createMockUnitOfWork()`, `createMockCache()` e outras), sem Nest DI e sem banco.
+São 101 suítes e 1149 testes em `test/unit/`, que espelha `src/`. Cada classe é instanciada direto, com mocks tipados das factories de `test/helpers/` (`createMockLogger()`, `createMockUnitOfWork()`, `createMockCache()`, `createMockWorkOrderGateway()`, `createMockInventoryCatalogGateway()` e as factories de orçamento de `quote-mock.factory.ts`), sem Nest DI e sem banco. Os casos de uso de orçamento rodam com o repositório e os gateways mockados; a `QuoteWorkOrderPolicy` e o `QuoteItemValidator` entram reais sobre os gateways mockados.
 
 A cobertura é **100% em lines, statements, functions e branches**, e o piso está em `package.json` → `jest.coverageThreshold`: o `npm run test:cov`, e com ele o job `Unit Tests` do CI, falha quando qualquer métrica cai abaixo de 100%. A coleta abrange todo `src/`, menos `*.module.ts`, `main.ts`, `otel.ts`, `*.enums.ts`, `*.config.ts`, `*.exception.ts`, `*.dto.ts` e `prisma.service.ts`. O `otel.ts` é coberto pelo `npm run test:smoke`, num processo real, no job `Build` do CI.
 
@@ -56,7 +58,7 @@ npm run test:e2e
 npm run test:e2e:cov
 ```
 
-São 6 suítes e 93 testes em `test/e2e/`, com containers reais por **Testcontainers 12**: PostgreSQL 18 (`postgres:18-alpine`) e Valkey 9.1 (`valkey/valkey:9.1`) em toda suíte, e LocalStack 4.14.0 na suíte de mensageria. Precisa de Docker. A configuração está em `test/jest-e2e.json`, com prazo de 10 minutos por teste para a subida dos containers.
+São 9 suítes e 195 testes em `test/e2e/`, com containers reais por **Testcontainers 12**: PostgreSQL 18 (`postgres:18-alpine`) e Valkey 9.1 (`valkey/valkey:9.1`) em toda suíte, e LocalStack 4.14.0 nas suítes de mensageria. Precisa de Docker. A configuração está em `test/jest-e2e.json`, com prazo de 10 minutos por teste para a subida dos containers.
 
 `setupTestApp()` (`test/helpers/test-app.helper.ts`) sobe o `INestApplication` pela mesma `configureApp()` do `main.ts`, aplica as migrations no PostgreSQL do teste e injeta a chave pública de teste. As opções ligam só o que a suíte usa:
 
@@ -67,6 +69,7 @@ São 6 suítes e 93 testes em `test/e2e/`, com containers reais por **Testcontai
 | `captureBootstrap` | Implica `captureLogs` e guarda as linhas do boot em `ctx.logCapture.bootstrapLines()` |
 | `withSwagger` | Registra o Swagger antes do `init()`, como o `main.ts` |
 | `withMessaging` | Sobe o LocalStack com `app/localstack/init-topology.sh` e liga o relay e o consumidor reais |
+| `internalServicesUrl` | URL do stub do Work Order e do Inventory; sem ela, `WORK_ORDER_SERVICE_URL` e `INVENTORY_SERVICE_URL` apontam para uma porta que recusa toda conexão |
 
 | Suíte | O que cobre |
 |---|---|
@@ -76,10 +79,13 @@ São 6 suítes e 93 testes em `test/e2e/`, com containers reais por **Testcontai
 | `telemetry.e2e-spec.ts` | Correlação log-trace com um `TracerProvider` em memória |
 | `messaging.e2e-spec.ts` | Outbox, relay, tópico, fila e consumidor reais (ver [Mensageria no E2E](#mensageria-no-e2e)) |
 | `all-exceptions.filter.e2e-spec.ts` | Corpo de erro público para exceções não tratadas |
+| `quote.e2e-spec.ts` | Rotas públicas de orçamento: autenticação, criação condicionada à OS, preço congelado, itens, envio com `billing.quote.sent` no outbox, aprovação com os outros orçamentos rejeitados e `billing.quote.approved`, rejeição com motivo, aprovações concorrentes (409), cache e listagens |
+| `internal-quote.e2e-spec.ts` | Rotas `/internal`: orçamento inicial e repetição, exclusão, detalhe e lista iguais às fixtures, decisão do cliente, `quote-usage` e ausência de token e de Swagger |
+| `quote-messaging.e2e-spec.ts` | Comando `billing.quote.revert_approval` pela fila real: reversão para `SENT` com os orçamentos restaurados e `billing.quote.approval_reverted` lido na fila do Work Order, comando repetido e orçamento inexistente |
 
 ## Rotas de teste nos E2E
 
-O Billing ainda não tem rota de negócio: a API expõe só os health checks e o Swagger. Os E2E do kit (autenticação, health, logging, telemetria e o filtro de exceções) precisam de uma rota autenticada, de uma rota que use o banco ou de uma rota que lance erro. Por isso cada suíte declara no próprio arquivo os controllers de que precisa e os monta com `setupTestApp({ controllers: [...] })`.
+Os E2E do kit (autenticação, health, logging, telemetria e o filtro de exceções) precisam de uma rota autenticada, de uma rota que use o banco ou de uma rota que lance erro. Em vez de usar as rotas de orçamento, cada suíte declara no próprio arquivo os controllers de que precisa e os monta com `setupTestApp({ controllers: [...] })`.
 
 ```ts
 @Controller('probe')
@@ -98,11 +104,11 @@ await request(ctx.httpServer)
   .expect(200);
 ```
 
-Esse é o padrão permanente dos E2E do kit, não um arranjo até as rotas de negócio chegarem:
+Esse é o padrão permanente dos E2E do kit:
 
 - O controller de teste passa pelo mesmo `AppModule`, pelo mesmo guard global, pelos mesmos filtros e pelo mesmo logging da aplicação. O que está sob teste é o kit, e ele fica igual.
 - Cada suíte controla exatamente a rota de que precisa: a de logging monta controllers em `/api/auth` e em `/api/services` para exercitar as regras do kit para esses caminhos; a de health segura uma requisição em voo no acesso ao banco; a de exceções lança o erro que quer ver traduzido.
-- As rotas de negócio, quando chegarem, ganham E2E próprios por domínio. Os E2E do kit não passam a depender delas, e uma mudança de contrato de negócio não quebra um teste de logging.
+- As rotas de orçamento têm E2E próprios (`quote`, `internal-quote` e `quote-messaging`). Os E2E do kit não dependem delas, e uma mudança de contrato de negócio não quebra um teste de logging.
 
 Os controllers de teste existem só nos arquivos de `test/e2e/`: nenhum entra no `AppModule` nem no Swagger publicado.
 
@@ -110,9 +116,33 @@ Os controllers de teste existem só nos arquivos de `test/e2e/`: nenhum entra no
 
 `test/helpers/staff-jwt.helper.ts` gera um par RS256 em tempo de execução (`generateKeyPairSync`, nunca um PEM versionado) e expõe `signTestStaffToken(claims, options?)`, que assina um access token com o `kid`, o emissor e a audiência de teste. `setupTestApp()` injeta a chave pública gerada em `STAFF_JWT_PUBLIC_KEY` antes de compilar o módulo, então o teste passa pelo mesmo caminho de configuração de produção.
 
+## Stub do Work Order e do Inventory
+
+As suítes de orçamento não sobem o Work Order nem o Inventory. `startInternalServicesStub()` (`test/helpers/internal-services-stub.ts`) abre um servidor HTTP local, numa porta livre, que responde `GET /internal/work-orders/:id`, `GET /internal/services/:id` e `GET /internal/parts-supplies/:id` a partir de mapas em memória:
+
+| Situação | Resposta do stub |
+| --- | --- |
+| Id cadastrado com `stubWorkOrder()`, `stubService()` ou `stubPartSupply()` | `200 { data }`, com o corpo da fixture do dono e o id e os campos pedidos no teste (status da OS, preço) |
+| Id em `failingIds` | `500`, para os casos de dono fora do ar (o Billing responde 503) |
+| Outro id | `404` com o corpo de erro dos serviços |
+
+A suíte passa `stub.url` em `setupTestApp({ internalServicesUrl })`, que a grava em `WORK_ORDER_SERVICE_URL` e `INVENTORY_SERVICE_URL` antes de compilar o módulo: o caminho é o mesmo de produção, com os gateways e o `InternalHttpClient` reais.
+
+## Contratos com outros serviços
+
+As fixtures de `app/test/contracts/` fixam os corpos trocados com outros serviços, e cada uma começa por `$source`, o repositório e o caminho de onde veio.
+
+| Pasta | Fixtures | Origem | Conferidas por |
+| --- | --- | --- | --- |
+| `contracts/` | `internal-quote.json`, `internal-quote-summary.json`, `internal-work-order-quotes.json`, `internal-quote-usage.json` | O próprio Billing (rotas `/internal` que ele serve) | `internal-quote.e2e-spec.ts`, que compara a resposta real com a fixture; o Work Order e o Inventory copiam estas fixtures |
+| `contracts/work-order/` | `internal-work-order.json` | Cópia da fixture de `GET /internal/work-orders/:id` do Work Order | Spec do `HttpWorkOrderGateway` e o stub dos E2E |
+| `contracts/inventory/` | `internal-service.json`, `internal-part-supply.json` | Cópia literal das fixtures de `GET /internal/services/:id` e `GET /internal/parts-supplies/:id` do Inventory | Spec do `HttpInventoryCatalogGateway` e o stub dos E2E |
+
+As cópias não são editadas aqui: quando o dono muda o contrato, a fixture é copiada de novo e o teste do gateway mostra o que quebrou. As fixtures do Inventory são provisórias: elas vêm do contrato que o Inventory publica para as rotas por id, ainda fora da `main` dele, e são recopiadas a cada mudança desse contrato.
+
 ## Mensageria no E2E
 
-O LocalStack só sobe com `setupTestApp({ withMessaging: true })`, a opção da suíte `messaging.e2e-spec.ts`. Nas outras suítes, o relay e o consumidor são substituídos por versões vazias.
+O LocalStack só sobe com `setupTestApp({ withMessaging: true })`, a opção das suítes `messaging.e2e-spec.ts` e `quote-messaging.e2e-spec.ts`. Nas outras suítes, o relay e o consumidor são substituídos por versões vazias, e os eventos são conferidos na tabela `outbox`.
 
 | Teste | O que prova |
 |---|---|
@@ -120,10 +150,12 @@ O LocalStack só sobe com `setupTestApp({ withMessaging: true })`, a opção da 
 | Rollback | Uma transação desfeita não deixa linha no outbox |
 | Lock do relay | Com outra transação segurando o lock do relay, nada é publicado; depois do commit dela, a mensagem sai |
 | Ordem do grupo | A falha da primeira mensagem de um grupo segura as seguintes do mesmo grupo |
-| Sem handler | Uma mensagem válida de tipo sem handler é registrada (`messaging.message.unhandled`) e não é confirmada |
+| Sem handler | Uma mensagem válida de tipo sem handler, enviada direto à `billing.fifo`, é registrada (`messaging.message.unhandled`) e não é confirmada |
 | Campos de log | As linhas da mensageria só emitem campos declarados no dicionário |
 
-O handler de teste é registrado para `billing.quote.revert_approval` no `beforeAll`; `billing.payment.cancel`, o outro tipo roteado para a fila, fica sem handler para o caso "Sem handler".
+O handler de teste é registrado para `billing.payment.cancel` no `beforeAll`, o tipo roteado para a fila que a aplicação não trata, então a suíte do kit não depende do handler de orçamento. O caso "Sem handler" manda `inventory.stock.reserved` direto para a fila, porque a filter policy nunca o roteia para o Billing.
+
+A suíte `quote-messaging.e2e-spec.ts` usa o handler real de `billing.quote.revert_approval`: publica o comando no tópico, espera o efeito no banco e lê a resposta `billing.quote.approval_reverted` na fila `work-order.fifo`, que a filter policy do LocalStack assina para esse tipo.
 
 ## Telemetria: o que o Jest não instrumenta
 
@@ -141,15 +173,30 @@ Nenhuma suíte define `OTEL_EXPORTER_OTLP_ENDPOINT`, então o SDK não inicia em
 
 A collection e o environment estão em `collections/`. Importe `collections/billing-collection.json` e `collections/billing-environment.json` no Postman e selecione o environment **Billing API**.
 
-`baseUrl` é só a origem, sem `/api`, e vale `http://localhost:3002`, a porta do Billing no host. Com o API Gateway implantado, troque só o `baseUrl` pela URL do gateway.
+As requests ficam em três pastas, com testes de status e de envelope (`{ data }`, `{ data, pagination }` ou o corpo de erro):
 
-As requests cobrem as rotas públicas de hoje, cada uma com teste de status `200`: `GET /api/health/live`, `GET /api/health/ready` e `GET /api/docs-json`.
+| Pasta | Requests |
+| --- | --- |
+| Health | `GET /api/health/live` e `GET /api/health/ready`, sem token |
+| Documentação | `GET /api/docs-json`, sem token |
+| Orçamentos | Todas as rotas públicas de orçamento, em sequência: criar com e sem itens, incluir, alterar e remover serviço e peça, detalhar, enviar, rejeitar com e sem motivo, listar paginado, filtrar por OS e por status, listar os orçamentos da OS e aprovar; depois os conflitos com o orçamento aprovado (409), os recursos inexistentes (404), a validação (400) e a falta de token (401) |
 
-Com o stack local no ar (Quick Start do README), a partir da raiz do repositório:
+A collection manda `Authorization: Bearer {{authToken}}`, e só os casos 401, as rotas de saúde e o Swagger dispensam o token. O environment traz a `baseUrl` única e os ids de exemplo:
+
+| Variável | Valor | O que precisa existir |
+| --- | --- | --- |
+| `baseUrl` | `http://localhost:3002` | O Billing; só a origem, sem `/api`. Com o API Gateway implantado, troque só o `baseUrl` pela URL do gateway |
+| `authToken` | vazio (secreto) | Um token de funcionário `ADMIN` assinado com o par cuja chave pública está no `.env` |
+| `workOrderId` | vazio | Uma OS do Work Order local em `AWAITING_APPROVAL`, sem orçamento `APPROVED` no Billing |
+| `serviceId`, `partSupplyId` | Ids canônicos do seed do Inventory (`Troca de óleo` e `FILT-OL-001`) | O Inventory local com o seed |
+
+A pasta **Orçamentos** guarda os ids que cria nas variáveis da collection `quoteId` e `quoteIdForReject`, então roda na ordem. Ela termina com um orçamento `APPROVED` na OS, e a criação passa a responder 409 para essa OS: cada execução precisa de outra `workOrderId`. O Billing não muda o status da OS, então a mesma OS serve do começo ao fim.
+
+Com o stack local do Billing no ar (Quick Start do README), o Work Order em `http://localhost:3000` e o Inventory em `http://localhost:3003`, a partir da raiz do repositório:
 
 ```bash
-# Rodar a collection contra a API local
-npx --yes newman run collections/billing-collection.json -e collections/billing-environment.json
+# Rodar a collection contra a API local, com o token e a OS da execução
+npx --yes newman run collections/billing-collection.json -e collections/billing-environment.json --env-var authToken=<token ADMIN> --env-var workOrderId=<id da OS>
 ```
 
 ## Mensagem de teste no ambiente

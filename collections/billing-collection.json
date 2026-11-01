@@ -4,6 +4,16 @@
     "name": "Billing API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
   "item": [
     {
       "name": "Health",
@@ -115,6 +125,1303 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Orçamentos",
+      "item": [
+        {
+          "name": "Criar orçamento sem itens (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Envelope { data } com o orçamento PENDING', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });",
+                  "pm.collectionVariables.set('quoteIdForReject', pm.response.json().data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{workOrderId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Enviar orçamento sem itens (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Corpo de erro com statusCode 409 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteIdForReject}}/submissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteIdForReject}}",
+                "submissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar orçamento com serviço e peça (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Envelope { data } com o orçamento PENDING', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });",
+                  "pm.test('Totais calculados', () => pm.expect(pm.response.json().data.totalAmount).to.be.above(0));",
+                  "pm.collectionVariables.set('quoteId', pm.response.json().data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{workOrderId}}\",\n  \"notes\": \"Orçamento com serviço e peça\",\n  \"services\": [\n    {\n      \"serviceId\": \"{{serviceId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"partsSupplies\": [\n    {\n      \"partSupplyId\": \"{{partSupplyId}}\",\n      \"quantity\": 2\n    }\n  ]\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Incluir serviço repetido (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Corpo de erro com statusCode 409 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "services"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": \"{{serviceId}}\",\n  \"quantity\": 1\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alterar a quantidade do serviço (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento PENDING', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/services/{{serviceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "services",
+                "{{serviceId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remover o serviço (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));",
+                  "pm.test('Corpo vazio', () => pm.expect(pm.response.text()).to.be.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/services/{{serviceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "services",
+                "{{serviceId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Incluir o serviço de novo (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento PENDING', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "services"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": \"{{serviceId}}\",\n  \"quantity\": 1\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remover a peça (204)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204 No Content', () => pm.response.to.have.status(204));",
+                  "pm.test('Corpo vazio', () => pm.expect(pm.response.text()).to.be.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/parts-supplies/{{partSupplyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "parts-supplies",
+                "{{partSupplyId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Incluir a peça de novo (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento PENDING', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/parts-supplies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "parts-supplies"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partSupplyId\": \"{{partSupplyId}}\",\n  \"quantity\": 2\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Incluir peça repetida (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Corpo de erro com statusCode 409 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/parts-supplies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "parts-supplies"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partSupplyId\": \"{{partSupplyId}}\",\n  \"quantity\": 2\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alterar a quantidade da peça (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento PENDING', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/parts-supplies/{{partSupplyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "parts-supplies",
+                "{{partSupplyId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 3\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalhar o orçamento com os itens (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento PENDING', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });",
+                  "pm.test('Itens com os dados de exibição do Inventory', () => { const res = pm.response.json(); pm.expect(res.data.services).to.have.lengthOf(1); pm.expect(res.data.partsSupplies).to.have.lengthOf(1); pm.expect(res.data.services[0].id).to.eql(pm.environment.get('serviceId')); pm.expect(res.data.services[0].name).to.be.a('string'); pm.expect(res.data.partsSupplies[0].quantity).to.eql(3); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Incluir serviço no orçamento sem itens (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento PENDING', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteIdForReject}}/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteIdForReject}}",
+                "services"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": \"{{serviceId}}\",\n  \"quantity\": 1\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Enviar o orçamento (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento SENT', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('SENT'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });",
+                  "pm.test('Data de envio gravada', () => pm.expect(pm.response.json().data.sentAt).to.be.a('string').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/submissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "submissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Enviar orçamento já enviado (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Corpo de erro com statusCode 409 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/submissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "submissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Enviar o segundo orçamento (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento SENT', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('SENT'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteIdForReject}}/submissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteIdForReject}}",
+                "submissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rejeitar sem justificativa (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Corpo de erro com statusCode 400 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(400); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteIdForReject}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteIdForReject}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REJECTED\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rejeitar com justificativa (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento REJECTED', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('REJECTED'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });",
+                  "pm.test('Data de rejeição gravada', () => pm.expect(pm.response.json().data.rejectedAt).to.be.a('string').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteIdForReject}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteIdForReject}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REJECTED\",\n  \"reason\": \"Cliente recusou o orçamento por ser acima do esperado\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar paginado (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data, pagination }', () => { const res = pm.response.json(); pm.expect(res.data).to.be.an('array'); pm.expect(res.pagination).to.include.keys('totalRecords', 'totalPages', 'page', 'limit'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Filtrar por OS (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Só orçamentos da OS', () => { const res = pm.response.json(); pm.expect(res.data.length).to.be.at.least(2); res.data.forEach((quote) => pm.expect(quote.workOrder.id).to.eql(pm.environment.get('workOrderId'))); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes?workOrderId={{workOrderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ],
+              "query": [
+                {
+                  "key": "workOrderId",
+                  "value": "{{workOrderId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar os orçamentos da OS (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com os orçamentos da OS', () => { const res = pm.response.json(); pm.expect(res.data).to.be.an('array'); pm.expect(res.data.map((quote) => quote.id)).to.include.members([pm.collectionVariables.get('quoteId'), pm.collectionVariables.get('quoteIdForReject')]); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/work-orders/{{workOrderId}}/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "work-orders",
+                "{{workOrderId}}",
+                "quotes"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Aprovar o orçamento (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com o orçamento APPROVED', () => { const res = pm.response.json(); pm.expect(res.data).to.have.property('id'); pm.expect(res.data.status).to.eql('APPROVED'); pm.expect(res.data.workOrder.id).to.eql(pm.environment.get('workOrderId')); });",
+                  "pm.test('Data de aprovação gravada', () => pm.expect(pm.response.json().data.approvedAt).to.be.a('string').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Aprovar orçamento já aprovado (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Corpo de erro com statusCode 409 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alterar serviço de orçamento aprovado (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Corpo de erro com statusCode 409 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/services/{{serviceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "services",
+                "{{serviceId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 1\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remover peça de orçamento aprovado (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Corpo de erro com statusCode 409 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/{{quoteId}}/parts-supplies/{{partSupplyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "{{quoteId}}",
+                "parts-supplies",
+                "{{partSupplyId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Filtrar por status APPROVED (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Só orçamentos aprovados', () => { const res = pm.response.json(); pm.expect(res.pagination.totalRecords).to.be.at.least(1); res.data.forEach((quote) => pm.expect(quote.status).to.eql('APPROVED')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes?status=APPROVED",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "APPROVED"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar orçamento com a OS já aprovada (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Corpo de erro com statusCode 409 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{workOrderId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalhar orçamento inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Corpo de erro com statusCode 404 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(404); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Incluir serviço em orçamento inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Corpo de erro com statusCode 404 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(404); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10",
+                "services"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceId\": \"{{serviceId}}\",\n  \"quantity\": 1\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Incluir peça em orçamento inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Corpo de erro com statusCode 404 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(404); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10/parts-supplies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10",
+                "parts-supplies"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partSupplyId\": \"{{partSupplyId}}\",\n  \"quantity\": 2\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Enviar orçamento inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Corpo de erro com statusCode 404 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(404); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10/submissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10",
+                "submissions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar orçamento para OS inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Corpo de erro com statusCode 404 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(404); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar orçamento sem workOrderId (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Erros de validação em lista', () => pm.expect(pm.response.json().message).to.be.an('array').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Sem ordem de serviço\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar orçamento sem autenticação (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo de erro com statusCode 401 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(401); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{workOrderId}}\"\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "quoteId",
+      "value": ""
+    },
+    {
+      "key": "quoteIdForReject",
+      "value": ""
     }
   ]
 }
