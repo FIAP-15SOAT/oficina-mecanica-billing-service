@@ -12,6 +12,7 @@ import { IFindWorkOrderQuotesUseCase } from '@application/ports/input/quote/find
 import { IFindWorkOrdersByIdsUseCase } from '@application/ports/input/quote/find-work-orders-by-ids.use-case.interface';
 import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
 import { ISubmitQuoteUseCase } from '@application/ports/input/quote/submit-quote.use-case.interface';
+import { IUpdateQuoteStatusUseCase } from '@application/ports/input/quote/update-quote-status.use-case.interface';
 
 import { CreateQuoteRequest } from './requests/create-quote-request';
 import { AddQuoteServiceRequest } from './requests/add-quote-service-request';
@@ -19,6 +20,7 @@ import { AddQuotePartSupplyRequest } from './requests/add-quote-part-supply-requ
 import { UpdateQuoteServiceItemRequest } from './requests/update-quote-service-item-request';
 import { UpdateQuotePartSupplyItemRequest } from './requests/update-quote-part-supply-item-request';
 import { FindAllQuotesQuery } from './requests/find-all-quotes-query';
+import { UpdateQuoteStatusRequest } from './requests/update-quote-status-request';
 
 import { QuotePresenter } from './quote.presenter';
 import {
@@ -39,6 +41,7 @@ export class QuoteController {
     private readonly updateQuoteServiceQuantityUseCase: IUpdateQuoteServiceQuantityUseCase,
     private readonly updateQuotePartSupplyQuantityUseCase: IUpdateQuotePartSupplyQuantityUseCase,
     private readonly submitQuoteUseCase: ISubmitQuoteUseCase,
+    private readonly updateQuoteStatusUseCase: IUpdateQuoteStatusUseCase,
     private readonly findAllQuotesPaginatedUseCase: IFindAllQuotesPaginatedUseCase,
     private readonly findWorkOrderQuotesUseCase: IFindWorkOrderQuotesUseCase,
     private readonly findWorkOrdersByIdsUseCase: IFindWorkOrdersByIdsUseCase,
@@ -132,6 +135,16 @@ export class QuoteController {
 
   async submit(quoteId: string, sentBy: string): Promise<QuoteDataResponse> {
     return this.toDataResponse(await this.submitQuoteUseCase.execute(quoteId, sentBy));
+  }
+
+  async updateStatus(
+    quoteId: string,
+    decidedBy: string,
+    input: UpdateQuoteStatusRequest,
+  ): Promise<QuoteDataResponse> {
+    return this.toDataResponse(
+      await this.updateQuoteStatusUseCase.execute(quoteId, decidedBy, input),
+    );
   }
 
   private async toDataResponse(quote: Quote): Promise<QuoteDataResponse> {

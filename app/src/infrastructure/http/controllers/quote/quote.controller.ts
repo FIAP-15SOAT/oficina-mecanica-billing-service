@@ -13,7 +13,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
@@ -42,6 +44,7 @@ import { AddQuotePartSupplyRequestDto } from './dto/requests/add-quote-part-supp
 import { UpdateQuoteServiceItemRequestDto } from './dto/requests/update-quote-service-item-request.dto';
 import { UpdateQuotePartSupplyItemRequestDto } from './dto/requests/update-quote-part-supply-item-request.dto';
 import { FindAllQuotesQueryDto } from './dto/requests/find-all-quotes-query.dto';
+import { UpdateQuoteStatusRequestDto } from './dto/requests/update-quote-status-request.dto';
 import {
   QuoteDataResponseDto,
   QuoteWithItemsDataResponseDto,
@@ -212,5 +215,27 @@ export class QuoteController {
     @CurrentPrincipal() principal: AuthenticatedPrincipal,
   ): Promise<QuoteDataResponseDto> {
     return this.controller.submit(id, principal.sub);
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN, UserRole.ATTENDANT)
+  @ApiOperation({ summary: 'Aprovar ou rejeitar orçamento' })
+  @ApiOkResponse({ type: QuoteDataResponseDto, description: 'Status do orçamento atualizado' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso negado' })
+  @ApiNotFoundResponse({ description: 'Orçamento ou Ordem de Serviço não encontrada' })
+  @ApiBadRequestResponse({ description: 'Justificativa ausente na rejeição' })
+  @ApiConflictResponse({
+    description:
+      'Orçamento fora de SENT, Ordem de Serviço fora de AWAITING_APPROVAL, outro orçamento já aprovado ou modificação concorrente',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID do orçamento' })
+  updateStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() request: UpdateQuoteStatusRequestDto,
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+  ): Promise<QuoteDataResponseDto> {
+    return this.controller.updateStatus(id, principal.sub, request);
   }
 }

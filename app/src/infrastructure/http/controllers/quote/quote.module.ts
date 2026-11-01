@@ -22,6 +22,9 @@ import { FindWorkOrderQuotesUseCase } from '@application/use-cases/quote/find-wo
 import { FindWorkOrdersByIdsUseCase } from '@application/use-cases/quote/find-work-orders-by-ids.use-case';
 import { FindQuoteItemsCatalogUseCase } from '@application/use-cases/quote/find-quote-items-catalog.use-case';
 import { SubmitQuoteUseCase } from '@application/use-cases/quote/submit-quote.use-case';
+import { ApproveQuoteUseCase } from '@application/use-cases/quote/approve-quote.use-case';
+import { RejectQuoteUseCase } from '@application/use-cases/quote/reject-quote.use-case';
+import { UpdateQuoteStatusUseCase } from '@application/use-cases/quote/update-quote-status.use-case';
 
 import { QuoteController as QuoteCleanController } from '@interface-adapters/quote/quote.controller';
 
@@ -69,6 +72,12 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
             inventoryCatalogGateway,
             logger,
             cache,
+          ),
+          new UpdateQuoteStatusUseCase(
+            quoteRepository,
+            quoteWorkOrderPolicy,
+            new ApproveQuoteUseCase(unitOfWork, quoteWorkOrderPolicy, logger, cache),
+            new RejectQuoteUseCase(unitOfWork, logger, cache),
           ),
           new FindAllQuotesPaginatedUseCase(quoteRepository),
           new FindWorkOrderQuotesUseCase(quoteRepository, cache),

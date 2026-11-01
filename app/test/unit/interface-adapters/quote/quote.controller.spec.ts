@@ -16,6 +16,7 @@ import { IFindWorkOrderQuotesUseCase } from '@application/ports/input/quote/find
 import { IFindWorkOrdersByIdsUseCase } from '@application/ports/input/quote/find-work-orders-by-ids.use-case.interface';
 import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
 import { ISubmitQuoteUseCase } from '@application/ports/input/quote/submit-quote.use-case.interface';
+import { IUpdateQuoteStatusUseCase } from '@application/ports/input/quote/update-quote-status.use-case.interface';
 import { ServiceRequestRejectedException } from '@application/exceptions/service-request-rejected.exception';
 
 import { createMockInventoryServiceGatewayResponse } from '../../../helpers/inventory-catalog-gateway-mock.factory';
@@ -35,6 +36,7 @@ describe('QuoteController', () => {
   let updateQuoteServiceQuantityUseCase: jest.Mocked<IUpdateQuoteServiceQuantityUseCase>;
   let updateQuotePartSupplyQuantityUseCase: jest.Mocked<IUpdateQuotePartSupplyQuantityUseCase>;
   let submitQuoteUseCase: jest.Mocked<ISubmitQuoteUseCase>;
+  let updateQuoteStatusUseCase: jest.Mocked<IUpdateQuoteStatusUseCase>;
   let findAllQuotesPaginatedUseCase: jest.Mocked<IFindAllQuotesPaginatedUseCase>;
   let findWorkOrderQuotesUseCase: jest.Mocked<IFindWorkOrderQuotesUseCase>;
   let findWorkOrdersByIdsUseCase: jest.Mocked<IFindWorkOrdersByIdsUseCase>;
@@ -51,6 +53,7 @@ describe('QuoteController', () => {
     updateQuoteServiceQuantityUseCase = { execute: jest.fn() };
     updateQuotePartSupplyQuantityUseCase = { execute: jest.fn() };
     submitQuoteUseCase = { execute: jest.fn() };
+    updateQuoteStatusUseCase = { execute: jest.fn() };
     findAllQuotesPaginatedUseCase = { execute: jest.fn() };
     findWorkOrderQuotesUseCase = { execute: jest.fn() };
     findWorkOrdersByIdsUseCase = { execute: jest.fn().mockResolvedValue([workOrder]) };
@@ -66,6 +69,7 @@ describe('QuoteController', () => {
       updateQuoteServiceQuantityUseCase,
       updateQuotePartSupplyQuantityUseCase,
       submitQuoteUseCase,
+      updateQuoteStatusUseCase,
       findAllQuotesPaginatedUseCase,
       findWorkOrderQuotesUseCase,
       findWorkOrdersByIdsUseCase,
@@ -221,5 +225,16 @@ describe('QuoteController', () => {
       QuotePresenter.toDataResponse(quote, workOrder),
     );
     expect(submitQuoteUseCase.execute).toHaveBeenCalledWith(quote.id, 'sender-id');
+  });
+
+  it('should update the quote status on behalf of the decider and embed its work order', async () => {
+    const input = { status: QuoteStatus.REJECTED, reason: 'Preço elevado' } as const;
+
+    updateQuoteStatusUseCase.execute.mockResolvedValue(quote);
+
+    await expect(controller.updateStatus(quote.id, 'decider-id', input)).resolves.toEqual(
+      QuotePresenter.toDataResponse(quote, workOrder),
+    );
+    expect(updateQuoteStatusUseCase.execute).toHaveBeenCalledWith(quote.id, 'decider-id', input);
   });
 });

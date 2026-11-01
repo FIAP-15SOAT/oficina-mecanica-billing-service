@@ -72,6 +72,29 @@ describe('Quote (E2E)', () => {
     });
   }
 
+  function setWorkOrderStatus(workOrderId: string, status: WorkOrderStatus): void {
+    stub.workOrders.set(workOrderId, { ...stub.workOrders.get(workOrderId), status });
+  }
+
+  async function createSentQuote(
+    workOrderId?: string,
+  ): Promise<{ id: string; workOrderId: string; service: { id: string } }> {
+    const service = stubService(stub, { basePrice: 150.5 });
+    const quote = await createQuote({
+      ...(workOrderId && { workOrderId }),
+      services: [{ serviceId: service.id, quantity: 2 }],
+    });
+
+    await api.post(`/api/quotes/${quote.id}/submissions`).expect(200);
+    setWorkOrderStatus(quote.workOrderId, WorkOrderStatus.AWAITING_APPROVAL);
+
+    return { ...quote, service };
+  }
+
+  async function findOutboxMessages(type: string): Promise<{ payload: unknown }[]> {
+    return ctx.prisma.outboxMessage.findMany({ where: { type }, orderBy: { id: 'asc' } });
+  }
+
   describe('authentication', () => {
     it('should answer 401 without a token', async () => {
       await request(httpServer).get('/api/quotes').expect(401);
@@ -574,10 +597,6 @@ describe('Quote (E2E)', () => {
       return { ...quote, service };
     }
 
-    function setWorkOrderStatus(workOrderId: string, status: WorkOrderStatus): void {
-      stub.workOrders.set(workOrderId, { ...stub.workOrders.get(workOrderId), status });
-    }
-
     it('should submit a quote', async () => {
       const { id } = await createQuoteWithService();
 
@@ -670,6 +689,292 @@ describe('Quote (E2E)', () => {
       await ctx.prisma.quote.update({ where: { id }, data: { status: 'SENT' } });
 
       await api.post('/api/quotes').send({ workOrderId }).expect(201);
+    });
+  });
+
+  describe('PATCH /api/quotes/:id', () => {
+    it('should approve a submitted quote and record its author', async () => {
+      const { id } = await createSentQuote();
+
+      const res = await api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }).expect(200);
+
+      expect(res.body.data).toEqual(expect.objectContaining({ id, status: 'APPROVED' }));
+
+      const quote = await ctx.prisma.quote.findUniqueOrThrow({ where: { id } });
+      expect(quote.decidedBy).toBe(staffId);
+      expect(quote.approvedAt).not.toBeNull();
+    });
+
+    it('should write billing.quote.approved with items, total and author', async () => {
+      const { id, workOrderId, service } = await createSentQuote();
+
+      await api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }).expect(200);
+
+      expect(await findOutboxMessages('billing.quote.approved')).toEqual([
+        expect.objectContaining({
+          workOrderId,
+          payload: {
+            quoteId: id,
+            decidedBy: staffId,
+            total: '301.00',
+            services: [{ serviceId: service.id, quantity: 2, unitPrice: '150.50' }],
+            partsSupplies: [],
+          },
+        }),
+      ]);
+    });
+
+    it('should reject the other open quotes of the work order with replaced_by_quote_id and sent_at', async () => {
+      const approved = await createSentQuote();
+      const sent = await createSentQuote(approved.workOrderId);
+      const pending = await createQuote({ workOrderId: approved.workOrderId });
+
+      await api.patch(`/api/quotes/${approved.id}`).send({ status: 'APPROVED' }).expect(200);
+
+      const rejectedQuotes = await ctx.prisma.quote.findMany({
+        where: { id: { in: [sent.id, pending.id] } },
+      });
+
+      expect(rejectedQuotes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: sent.id,
+            status: 'REJECTED',
+            replacedByQuoteId: approved.id,
+            sentAt: expect.any(Date),
+          }),
+          expect.objectContaining({
+            id: pending.id,
+            status: 'REJECTED',
+            replacedByQuoteId: approved.id,
+            sentAt: null,
+          }),
+        ]),
+      );
+
+      expect(await findOutboxMessages('billing.quote.rejected')).toEqual([]);
+    });
+
+    it('should show an open quote rejected by the approval as REJECTED after its detail was cached', async () => {
+      const approved = await createSentQuote();
+      const sent = await createSentQuote(approved.workOrderId);
+
+      await api.get(`/api/quotes/${sent.id}`).expect(200);
+      await api.get(`/api/work-orders/${approved.workOrderId}/quotes`).expect(200);
+
+      await api.patch(`/api/quotes/${approved.id}`).send({ status: 'APPROVED' }).expect(200);
+
+      const detail = await api.get(`/api/quotes/${sent.id}`).expect(200);
+
+      expect(detail.body.data.status).toBe('REJECTED');
+
+      const list = await api.get(`/api/work-orders/${approved.workOrderId}/quotes`).expect(200);
+
+      expect(list.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: approved.id, status: 'APPROVED' }),
+          expect.objectContaining({ id: sent.id, status: 'REJECTED' }),
+        ]),
+      );
+    });
+
+    it('should refuse an approval with 409 when another quote of the work order is APPROVED', async () => {
+      const approved = await createSentQuote();
+
+      await api.patch(`/api/quotes/${approved.id}`).send({ status: 'APPROVED' }).expect(200);
+      // Creation is refused while the work order has an approved quote, so the race is set up in the database.
+      const raced = await ctx.prisma.quote.create({
+        data: { workOrderId: approved.workOrderId, status: 'SENT', sentAt: new Date() },
+      });
+
+      const res = await api
+        .patch(`/api/quotes/${raced.id}`)
+        .send({ status: 'APPROVED' })
+        .expect(409);
+
+      expect(res.body.message).toBe('A ordem de serviço já tem um orçamento aprovado');
+
+      const quote = await ctx.prisma.quote.findUniqueOrThrow({ where: { id: raced.id } });
+
+      expect(quote.status).toBe('SENT');
+      expect(await findOutboxMessages('billing.quote.approved')).toHaveLength(1);
+    });
+
+    it('should accept a new approval after the approved quote went back to SENT', async () => {
+      const { id } = await createSentQuote();
+
+      await api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }).expect(200);
+
+      await ctx.prisma.quote.update({
+        where: { id },
+        data: { status: 'SENT', approvedAt: null, decidedBy: null },
+      });
+
+      await api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }).expect(200);
+
+      const messages = await findOutboxMessages('billing.quote.approved');
+      expect(messages.map(({ payload }) => payload)).toEqual([
+        expect.objectContaining({ quoteId: id }),
+        expect.objectContaining({ quoteId: id }),
+      ]);
+    });
+
+    it('should answer 409 and approve nothing when the work order is not AWAITING_APPROVAL', async () => {
+      const { id, workOrderId } = await createSentQuote();
+      setWorkOrderStatus(workOrderId, WorkOrderStatus.IN_DIAGNOSIS);
+
+      const res = await api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }).expect(409);
+
+      expect(res.body.message).toBe(
+        'Transição de status não permitida: de IN_DIAGNOSIS para APPROVED',
+      );
+
+      const quote = await ctx.prisma.quote.findUniqueOrThrow({ where: { id } });
+      expect(quote.status).toBe('SENT');
+    });
+
+    it('should answer 409 when approving a PENDING quote', async () => {
+      const { id, workOrderId } = await createQuote();
+      setWorkOrderStatus(workOrderId, WorkOrderStatus.AWAITING_APPROVAL);
+
+      await api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }).expect(409);
+
+      expect(await findOutboxMessages('billing.quote.approved')).toEqual([]);
+    });
+
+    it('should reject a submitted quote with reason, author and remainingSentCount', async () => {
+      const rejected = await createSentQuote();
+      await createSentQuote(rejected.workOrderId);
+
+      const res = await api
+        .patch(`/api/quotes/${rejected.id}`)
+        .send({ status: 'REJECTED', reason: 'Preço fora do esperado' })
+        .expect(200);
+
+      expect(res.body.data.status).toBe('REJECTED');
+
+      const quote = await ctx.prisma.quote.findUniqueOrThrow({ where: { id: rejected.id } });
+      expect(quote).toEqual(
+        expect.objectContaining({ rejectionReason: 'Preço fora do esperado', decidedBy: staffId }),
+      );
+      expect(await findOutboxMessages('billing.quote.rejected')).toEqual([
+        expect.objectContaining({
+          workOrderId: rejected.workOrderId,
+          payload: {
+            quoteId: rejected.id,
+            reason: 'Preço fora do esperado',
+            remainingSentCount: 1,
+            decidedBy: staffId,
+          },
+        }),
+      ]);
+    });
+
+    it('should reject without checking the work order status', async () => {
+      const { id, workOrderId } = await createSentQuote();
+      setWorkOrderStatus(workOrderId, WorkOrderStatus.RECEIVED);
+
+      await api
+        .patch(`/api/quotes/${id}`)
+        .send({ status: 'REJECTED', reason: 'Cliente desistiu' })
+        .expect(200);
+    });
+
+    it.each([{}, { reason: '   ' }])(
+      'should return 400 and change nothing when rejecting with %p',
+      async (body) => {
+        const { id } = await createSentQuote();
+
+        const res = await api
+          .patch(`/api/quotes/${id}`)
+          .send({ status: 'REJECTED', ...body })
+          .expect(400);
+
+        expect(res.body.message).toBe('A justificativa é obrigatória para rejeitar um orçamento');
+        const quote = await ctx.prisma.quote.findUniqueOrThrow({ where: { id } });
+        expect(quote.status).toBe('SENT');
+      },
+    );
+
+    it('should return 400 with invalid status', async () => {
+      await api.patch(`/api/quotes/${randomUUID()}`).send({ status: 'INVALID' }).expect(400);
+    });
+
+    it.each([{ status: 'APPROVED' }, { status: 'REJECTED', reason: 'Cliente desistiu' }])(
+      'should return 404 for an unknown quote with %p',
+      async (body) => {
+        await api.patch(`/api/quotes/${randomUUID()}`).send(body).expect(404);
+      },
+    );
+
+    it('should return 403 for a MECHANIC token', async () => {
+      const mechanicToken = signTestStaffToken({
+        sub: randomUUID(),
+        email: 'mechanic@e2e.test',
+        name: 'Mechanic E2E',
+        role: 'MECHANIC',
+      });
+
+      await request(httpServer)
+        .patch(`/api/quotes/${randomUUID()}`)
+        .set('Authorization', `Bearer ${mechanicToken}`)
+        .send({ status: 'APPROVED' })
+        .expect(403);
+    });
+  });
+
+  describe('Quote approval — Concurrency (optimistic locking)', () => {
+    it('should allow exactly one of two concurrent approvals of the same quote', async () => {
+      const { id } = await createSentQuote();
+
+      const responses = await Promise.all([
+        api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }),
+        api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }),
+      ]);
+
+      expect(responses.map(({ status }) => status).sort()).toEqual([200, 409]);
+      expect(await findOutboxMessages('billing.quote.approved')).toHaveLength(1);
+    });
+
+    it('should allow exactly one of two concurrent approvals of different SENT quotes of the same work order', async () => {
+      for (let round = 0; round < 5; round += 1) {
+        await cleanDatabase(ctx.prisma);
+        const first = await createSentQuote();
+        const second = await createSentQuote(first.workOrderId);
+
+        const responses = await Promise.all([
+          api.patch(`/api/quotes/${first.id}`).send({ status: 'APPROVED' }),
+          api.patch(`/api/quotes/${second.id}`).send({ status: 'APPROVED' }),
+        ]);
+
+        expect(responses.map(({ status }) => status).sort()).toEqual([200, 409]);
+        expect(
+          await ctx.prisma.quote.count({
+            where: { workOrderId: first.workOrderId, status: 'APPROVED' },
+          }),
+        ).toBe(1);
+        expect(await findOutboxMessages('billing.quote.approved')).toHaveLength(1);
+      }
+    });
+
+    it('should return 409 when approving an already-approved quote', async () => {
+      const { id } = await createSentQuote();
+      await api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }).expect(200);
+
+      await api.patch(`/api/quotes/${id}`).send({ status: 'APPROVED' }).expect(409);
+    });
+
+    it('should return 409 when rejecting an already-rejected quote', async () => {
+      const { id } = await createSentQuote();
+      await api
+        .patch(`/api/quotes/${id}`)
+        .send({ status: 'REJECTED', reason: 'Preço elevado' })
+        .expect(200);
+
+      await api
+        .patch(`/api/quotes/${id}`)
+        .send({ status: 'REJECTED', reason: 'Outro motivo' })
+        .expect(409);
     });
   });
 

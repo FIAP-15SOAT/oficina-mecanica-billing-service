@@ -11,6 +11,7 @@ import { AddQuotePartSupplyRequestDto } from '@infrastructure/http/controllers/q
 import { UpdateQuoteServiceItemRequestDto } from '@infrastructure/http/controllers/quote/dto/requests/update-quote-service-item-request.dto';
 import { UpdateQuotePartSupplyItemRequestDto } from '@infrastructure/http/controllers/quote/dto/requests/update-quote-part-supply-item-request.dto';
 import { FindAllQuotesQueryDto } from '@infrastructure/http/controllers/quote/dto/requests/find-all-quotes-query.dto';
+import { UpdateQuoteStatusRequestDto } from '@infrastructure/http/controllers/quote/dto/requests/update-quote-status-request.dto';
 
 import { createMockQuote } from '../../../../../helpers/quote-mock.factory';
 import { createMockWorkOrderGatewayResponse } from '../../../../../helpers/work-order-gateway-mock.factory';
@@ -25,6 +26,7 @@ describe('QuoteController (http)', () => {
 
   beforeEach(() => {
     cleanController = new QuoteCleanController(
+      { execute: jest.fn() },
       { execute: jest.fn() },
       { execute: jest.fn() },
       { execute: jest.fn() },
@@ -125,5 +127,16 @@ describe('QuoteController (http)', () => {
 
     await expect(httpController.submit(quote.id, principal)).resolves.toBe(dataResponse);
     expect(cleanController.submit).toHaveBeenCalledWith(quote.id, 'sender-id');
+  });
+
+  it('should delegate the status update with the id of the authenticated decider', async () => {
+    const principal = { sub: 'decider-id', email: 'admin@oficina.com', role: UserRole.ADMIN };
+    const request: UpdateQuoteStatusRequestDto = { status: QuoteStatus.APPROVED };
+    jest.spyOn(cleanController, 'updateStatus').mockResolvedValue(dataResponse);
+
+    await expect(httpController.updateStatus(quote.id, request, principal)).resolves.toBe(
+      dataResponse,
+    );
+    expect(cleanController.updateStatus).toHaveBeenCalledWith(quote.id, 'decider-id', request);
   });
 });

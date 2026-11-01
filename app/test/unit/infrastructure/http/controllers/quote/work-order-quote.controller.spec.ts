@@ -24,6 +24,7 @@ describe('WorkOrderQuoteController', () => {
       { execute: jest.fn() },
       { execute: jest.fn() },
       { execute: jest.fn() },
+      { execute: jest.fn() },
     );
     httpController = new WorkOrderQuoteController(cleanController);
   });
