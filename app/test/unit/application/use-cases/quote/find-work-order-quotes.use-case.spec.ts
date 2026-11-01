@@ -16,8 +16,10 @@ describe('FindWorkOrderQuotesUseCase', () => {
 
   beforeEach(() => {
     quoteRepository = createMockQuoteRepository();
+
     cache = createMockCache();
     cache.get.mockResolvedValue(null);
+
     useCase = new FindWorkOrderQuotesUseCase(quoteRepository, cache);
   });
 

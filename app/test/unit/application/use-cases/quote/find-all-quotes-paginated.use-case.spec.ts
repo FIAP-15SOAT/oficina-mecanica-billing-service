@@ -11,6 +11,7 @@ describe('FindAllQuotesPaginatedUseCase', () => {
 
   beforeEach(() => {
     quoteRepository = createMockQuoteRepository();
+
     useCase = new FindAllQuotesPaginatedUseCase(quoteRepository);
   });
 

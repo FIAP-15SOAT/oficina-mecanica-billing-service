@@ -12,6 +12,7 @@ describe('FindWorkOrdersByIdsUseCase', () => {
 
   beforeEach(() => {
     workOrderGateway = createMockWorkOrderGateway();
+
     useCase = new FindWorkOrdersByIdsUseCase(workOrderGateway);
   });
 

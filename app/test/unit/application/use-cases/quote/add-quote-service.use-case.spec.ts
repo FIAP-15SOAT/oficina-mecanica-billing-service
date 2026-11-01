@@ -29,11 +29,16 @@ describe('AddQuoteServiceUseCase', () => {
   beforeEach(() => {
     const mock = createMockUnitOfWorkWithRepos();
     unitOfWork = mock.unitOfWork;
+
     transactionQuoteRepository = mock.repos.quote as jest.Mocked<IQuoteRepository>;
     transactionQuoteRepository.update.mockImplementation((quote) => Promise.resolve(quote));
+
     quoteRepository = createMockQuoteRepository();
+
     inventoryCatalogGateway = createMockInventoryCatalogGateway();
+
     cache = createMockCache();
+
     useCase = new AddQuoteServiceUseCase(
       quoteRepository,
       unitOfWork,

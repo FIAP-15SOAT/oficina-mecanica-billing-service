@@ -80,9 +80,11 @@ describe('InternalQuoteController', () => {
 
   it('should show a quote with the inventory display data', async () => {
     const service = createMockInventoryServiceGatewayResponse();
+
     const quote = createMockQuote({
       services: [createMockQuoteService({ serviceId: service.id })],
     });
+
     const catalog = { services: [service], partsSupplies: [] };
 
     findQuoteByIdUseCase.execute.mockResolvedValue(quote);

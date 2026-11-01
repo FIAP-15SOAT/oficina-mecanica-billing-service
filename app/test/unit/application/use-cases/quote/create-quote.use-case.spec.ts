@@ -36,12 +36,16 @@ describe('CreateQuoteUseCase', () => {
     quoteRepository = createMockQuoteRepository();
     quoteRepository.findByWorkOrderId.mockResolvedValue([]);
     quoteRepository.create.mockImplementation((quote) => Promise.resolve(quote));
+
     workOrderGateway = createMockWorkOrderGateway();
     workOrderGateway.findById.mockResolvedValue(
       createMockWorkOrderGatewayResponse({ id: workOrderId }),
     );
+
     inventoryCatalogGateway = createMockInventoryCatalogGateway();
+
     cache = createMockCache();
+
     useCase = new CreateQuoteUseCase(
       quoteRepository,
       new QuoteWorkOrderPolicy(workOrderGateway),

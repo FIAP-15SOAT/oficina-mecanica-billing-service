@@ -15,6 +15,7 @@ describe('QuoteItemValidator', () => {
 
   beforeEach(() => {
     inventoryCatalogGateway = createMockInventoryCatalogGateway();
+
     validator = new QuoteItemValidator(inventoryCatalogGateway);
   });
 

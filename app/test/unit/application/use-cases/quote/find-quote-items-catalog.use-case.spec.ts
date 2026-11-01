@@ -18,6 +18,7 @@ describe('FindQuoteItemsCatalogUseCase', () => {
 
   beforeEach(() => {
     inventoryCatalogGateway = createMockInventoryCatalogGateway();
+
     useCase = new FindQuoteItemsCatalogUseCase(inventoryCatalogGateway);
   });
 

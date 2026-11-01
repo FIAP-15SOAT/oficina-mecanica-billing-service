@@ -50,17 +50,25 @@ describe('SubmitQuoteUseCase', () => {
   beforeEach(() => {
     const mock = createMockUnitOfWorkWithRepos();
     unitOfWork = mock.unitOfWork;
+
     transactionQuoteRepository = mock.repos.quote as jest.Mocked<IQuoteRepository>;
     transactionQuoteRepository.update.mockImplementation((quote) => Promise.resolve(quote));
+
     outboxRepository = mock.repos.outbox as jest.Mocked<IOutboxRepository>;
+
     quoteRepository = createMockQuoteRepository();
     quoteRepository.findByWorkOrderId.mockResolvedValue([]);
+
     workOrderGateway = createMockWorkOrderGateway();
     workOrderGateway.findById.mockResolvedValue(createMockWorkOrderGatewayResponse());
+
     inventoryCatalogGateway = createMockInventoryCatalogGateway();
     inventoryCatalogGateway.findPartsSuppliesByIds.mockResolvedValue([]);
+
     logger = createMockLogger();
+
     cache = createMockCache();
+
     useCase = new SubmitQuoteUseCase(
       quoteRepository,
       unitOfWork,

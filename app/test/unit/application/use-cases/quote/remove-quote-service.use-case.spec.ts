@@ -20,9 +20,12 @@ describe('RemoveQuoteServiceUseCase', () => {
   beforeEach(() => {
     const mock = createMockUnitOfWorkWithRepos();
     unitOfWork = mock.unitOfWork;
+
     quoteRepository = mock.repos.quote as jest.Mocked<IQuoteRepository>;
     quoteRepository.update.mockImplementation((quote) => Promise.resolve(quote));
+
     cache = createMockCache();
+
     useCase = new RemoveQuoteServiceUseCase(unitOfWork, cache);
   });
 

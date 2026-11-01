@@ -15,8 +15,10 @@ describe('FindQuoteByIdUseCase', () => {
 
   beforeEach(() => {
     quoteRepository = createMockQuoteRepository();
+
     cache = createMockCache();
     cache.get.mockResolvedValue(null);
+
     useCase = new FindQuoteByIdUseCase(quoteRepository, cache);
   });
 

@@ -17,6 +17,7 @@ describe('HttpWorkOrderGateway', () => {
 
   beforeEach(() => {
     internalHttpClient = { request: jest.fn().mockResolvedValue(fixture) };
+
     gateway = new HttpWorkOrderGateway(
       internalHttpClient as unknown as InternalHttpClient,
       new ConfigService({ WORK_ORDER_SERVICE_URL: baseUrl }),

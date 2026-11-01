@@ -45,18 +45,31 @@ describe('QuoteController', () => {
 
   beforeEach(() => {
     createQuoteUseCase = { execute: jest.fn() };
+
     findQuoteByIdUseCase = { execute: jest.fn().mockResolvedValue(quote) };
+
     addQuoteServiceUseCase = { execute: jest.fn() };
+
     removeQuoteServiceUseCase = { execute: jest.fn() };
+
     addQuotePartSupplyUseCase = { execute: jest.fn() };
+
     removeQuotePartSupplyUseCase = { execute: jest.fn() };
+
     updateQuoteServiceQuantityUseCase = { execute: jest.fn() };
+
     updateQuotePartSupplyQuantityUseCase = { execute: jest.fn() };
+
     submitQuoteUseCase = { execute: jest.fn() };
+
     updateQuoteStatusUseCase = { execute: jest.fn() };
+
     findAllQuotesPaginatedUseCase = { execute: jest.fn() };
+
     findWorkOrderQuotesUseCase = { execute: jest.fn() };
+
     findWorkOrdersByIdsUseCase = { execute: jest.fn().mockResolvedValue([workOrder]) };
+
     findQuoteItemsCatalogUseCase = { execute: jest.fn() };
 
     controller = new QuoteController(

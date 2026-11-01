@@ -41,6 +41,7 @@ describe('QuoteController (http)', () => {
       { execute: jest.fn() },
       { execute: jest.fn() },
     );
+
     httpController = new QuoteController(cleanController);
   });
 

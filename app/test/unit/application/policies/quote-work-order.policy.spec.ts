@@ -20,6 +20,7 @@ describe('QuoteWorkOrderPolicy', () => {
 
   beforeEach(() => {
     workOrderGateway = createMockWorkOrderGateway();
+
     policy = new QuoteWorkOrderPolicy(workOrderGateway);
   });
 

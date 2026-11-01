@@ -113,6 +113,7 @@ describe('Internal quote routes (E2E)', () => {
       const repeated = await createInitialQuote(first.workOrderId);
 
       expect(repeated.id).toBe(first.id);
+
       await expect(
         ctx.prisma.quote.count({ where: { workOrderId: first.workOrderId } }),
       ).resolves.toBe(1);
@@ -197,6 +198,7 @@ describe('Internal quote routes (E2E)', () => {
         .expect(200);
 
       expect(res.body.data).toEqual([expect.objectContaining({ id: quote.id })]);
+
       expect(jsonShape(res.body)).toEqual(
         jsonShape(readFixture('internal-work-order-quotes.json')),
       );

@@ -20,6 +20,7 @@ describe('HttpInventoryCatalogGateway', () => {
 
   beforeEach(() => {
     internalHttpClient = { request: jest.fn() };
+
     gateway = new HttpInventoryCatalogGateway(
       internalHttpClient as unknown as InternalHttpClient,
       new ConfigService({ INVENTORY_SERVICE_URL: baseUrl }),
