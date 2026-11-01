@@ -77,7 +77,7 @@ describe('HttpInventoryCatalogGateway', () => {
     });
 
     it('should propagate unavailability', async () => {
-      const unavailable = new ServiceIntegrationException('Serviço de destino indisponível.');
+      const unavailable = new ServiceIntegrationException('Serviço de destino indisponível');
 
       internalHttpClient.request.mockRejectedValue(unavailable);
 

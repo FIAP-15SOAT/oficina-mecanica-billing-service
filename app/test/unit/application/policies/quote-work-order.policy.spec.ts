@@ -89,7 +89,7 @@ describe('QuoteWorkOrderPolicy', () => {
   });
 
   it('should propagate the work order unavailability as 503', async () => {
-    const unavailable = new ServiceIntegrationException('Serviço de destino indisponível.');
+    const unavailable = new ServiceIntegrationException('Serviço de destino indisponível');
     workOrderGateway.findById.mockRejectedValue(unavailable);
 
     await expect(policy.ensureCanSubmitQuote(workOrderId)).rejects.toBe(unavailable);

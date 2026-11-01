@@ -38,7 +38,7 @@ describe('HttpWorkOrderGateway', () => {
 
   it('should let owner rejections and unavailability through', async () => {
     const notFound = new ServiceRequestRejectedException(404, 'Ordem de Serviço não encontrado(a)');
-    const unavailable = new ServiceIntegrationException('Serviço de destino indisponível.');
+    const unavailable = new ServiceIntegrationException('Serviço de destino indisponível');
 
     internalHttpClient.request.mockRejectedValueOnce(notFound).mockRejectedValueOnce(unavailable);
 
