@@ -21,6 +21,8 @@ describe('InternalQuoteController (http)', () => {
       { execute: jest.fn() },
       { execute: jest.fn() },
       { execute: jest.fn() },
+      { execute: jest.fn() },
+      { execute: jest.fn() },
     );
 
     httpController = new InternalQuoteController(cleanController);
@@ -69,5 +71,25 @@ describe('InternalQuoteController (http)', () => {
 
     await expect(httpController.decide(quote.id, input)).resolves.toBe(response);
     expect(cleanController.decide).toHaveBeenCalledWith(quote.id, input);
+  });
+
+  it('should delegate the service quote usage', async () => {
+    const response = QuotePresenter.toInternalUsageDataResponse(true);
+
+    jest.spyOn(cleanController, 'findServiceQuoteUsage').mockResolvedValue(response);
+
+    await expect(httpController.findServiceQuoteUsage('service-id')).resolves.toBe(response);
+
+    expect(cleanController.findServiceQuoteUsage).toHaveBeenCalledWith('service-id');
+  });
+
+  it('should delegate the part supply quote usage', async () => {
+    const response = QuotePresenter.toInternalUsageDataResponse(false);
+
+    jest.spyOn(cleanController, 'findPartSupplyQuoteUsage').mockResolvedValue(response);
+
+    await expect(httpController.findPartSupplyQuoteUsage('part-supply-id')).resolves.toBe(response);
+
+    expect(cleanController.findPartSupplyQuoteUsage).toHaveBeenCalledWith('part-supply-id');
   });
 });

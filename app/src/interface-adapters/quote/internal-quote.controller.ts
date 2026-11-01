@@ -5,6 +5,8 @@ import { IFindQuoteByIdUseCase } from '@application/ports/input/quote/find-quote
 import { IFindWorkOrderQuotesUseCase } from '@application/ports/input/quote/find-work-order-quotes.use-case.interface';
 import { IDecideQuoteUseCase } from '@application/ports/input/quote/decide-quote.use-case.interface';
 import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
+import { ICheckServiceQuoteUsageUseCase } from '@application/ports/input/quote/check-service-quote-usage.use-case.interface';
+import { ICheckPartSupplyQuoteUsageUseCase } from '@application/ports/input/quote/check-part-supply-quote-usage.use-case.interface';
 
 import { CreateQuoteRequest } from './requests/create-quote-request';
 import { DecideQuoteRequest } from './requests/decide-quote-request';
@@ -13,6 +15,7 @@ import { QuotePresenter } from './quote.presenter';
 import {
   InternalQuoteDataResponse,
   InternalQuoteListResponse,
+  InternalQuoteUsageDataResponse,
   InternalQuoteWithItemsDataResponse,
 } from './responses/internal-quote.response';
 
@@ -26,6 +29,8 @@ export class InternalQuoteController {
     private readonly findWorkOrderQuotesUseCase: IFindWorkOrderQuotesUseCase,
     private readonly decideQuoteUseCase: IDecideQuoteUseCase,
     private readonly findQuoteItemsCatalogUseCase: IFindQuoteItemsCatalogUseCase,
+    private readonly checkServiceQuoteUsageUseCase: ICheckServiceQuoteUsageUseCase,
+    private readonly checkPartSupplyQuoteUsageUseCase: ICheckPartSupplyQuoteUsageUseCase,
   ) {}
 
   async createInitial(input: CreateQuoteRequest): Promise<InternalQuoteDataResponse> {
@@ -50,6 +55,18 @@ export class InternalQuoteController {
 
   async decide(id: string, input: DecideQuoteRequest): Promise<InternalQuoteWithItemsDataResponse> {
     return this.toWithItemsResponse(await this.decideQuoteUseCase.execute(id, input));
+  }
+
+  async findServiceQuoteUsage(serviceId: string): Promise<InternalQuoteUsageDataResponse> {
+    return QuotePresenter.toInternalUsageDataResponse(
+      await this.checkServiceQuoteUsageUseCase.execute(serviceId),
+    );
+  }
+
+  async findPartSupplyQuoteUsage(partSupplyId: string): Promise<InternalQuoteUsageDataResponse> {
+    return QuotePresenter.toInternalUsageDataResponse(
+      await this.checkPartSupplyQuoteUsageUseCase.execute(partSupplyId),
+    );
   }
 
   private async toWithItemsResponse(quote: Quote): Promise<InternalQuoteWithItemsDataResponse> {

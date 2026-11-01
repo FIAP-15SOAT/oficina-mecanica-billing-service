@@ -19,6 +19,7 @@ import { InternalQuoteController as InternalQuoteCleanController } from '@interf
 import {
   InternalQuoteDataResponse,
   InternalQuoteListResponse,
+  InternalQuoteUsageDataResponse,
   InternalQuoteWithItemsDataResponse,
 } from '@interface-adapters/quote/responses/internal-quote.response';
 
@@ -60,5 +61,19 @@ export class InternalQuoteController {
     @Body() request: DecideQuoteRequestDto,
   ): Promise<InternalQuoteWithItemsDataResponse> {
     return this.controller.decide(id, request);
+  }
+
+  @Get('services/:serviceId/quote-usage')
+  findServiceQuoteUsage(
+    @Param('serviceId', ParseUUIDPipe) serviceId: string,
+  ): Promise<InternalQuoteUsageDataResponse> {
+    return this.controller.findServiceQuoteUsage(serviceId);
+  }
+
+  @Get('parts-supplies/:partSupplyId/quote-usage')
+  findPartSupplyQuoteUsage(
+    @Param('partSupplyId', ParseUUIDPipe) partSupplyId: string,
+  ): Promise<InternalQuoteUsageDataResponse> {
+    return this.controller.findPartSupplyQuoteUsage(partSupplyId);
   }
 }

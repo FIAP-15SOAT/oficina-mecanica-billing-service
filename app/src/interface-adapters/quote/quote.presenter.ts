@@ -24,6 +24,7 @@ import {
   InternalQuoteDataResponse,
   InternalQuoteListResponse,
   InternalQuoteResponse,
+  InternalQuoteUsageDataResponse,
   InternalQuoteWithItemsDataResponse,
 } from './responses/internal-quote.response';
 
@@ -99,6 +100,10 @@ export class QuotePresenter {
 
   static toInternalListResponse(quotes: Quote[]): InternalQuoteListResponse {
     return { data: quotes.map((quote) => QuotePresenter.toInternalResponse(quote)) };
+  }
+
+  static toInternalUsageDataResponse(inUse: boolean): InternalQuoteUsageDataResponse {
+    return { data: { inUse } };
   }
 
   static toListResponse(

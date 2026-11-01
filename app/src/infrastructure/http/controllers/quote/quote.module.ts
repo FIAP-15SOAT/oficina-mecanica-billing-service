@@ -29,6 +29,8 @@ import { RevertQuoteApprovalUseCase } from '@application/use-cases/quote/revert-
 import { CreateInitialQuoteUseCase } from '@application/use-cases/quote/create-initial-quote.use-case';
 import { DeleteQuoteUseCase } from '@application/use-cases/quote/delete-quote.use-case';
 import { DecideQuoteUseCase } from '@application/use-cases/quote/decide-quote.use-case';
+import { CheckServiceQuoteUsageUseCase } from '@application/use-cases/quote/check-service-quote-usage.use-case';
+import { CheckPartSupplyQuoteUsageUseCase } from '@application/use-cases/quote/check-part-supply-quote-usage.use-case';
 
 import { QuoteController as QuoteCleanController } from '@interface-adapters/quote/quote.controller';
 import { InternalQuoteController as InternalQuoteCleanController } from '@interface-adapters/quote/internal-quote.controller';
@@ -130,6 +132,8 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
             new RejectQuoteUseCase(unitOfWork, logger, cache),
           ),
           new FindQuoteItemsCatalogUseCase(inventoryCatalogGateway),
+          new CheckServiceQuoteUsageUseCase(quoteRepository),
+          new CheckPartSupplyQuoteUsageUseCase(quoteRepository),
         ),
       inject: [
         'IUnitOfWork',

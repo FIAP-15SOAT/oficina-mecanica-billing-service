@@ -35,3 +35,11 @@ export interface InternalQuoteWithItemsDataResponse {
 export interface InternalQuoteListResponse {
   data: InternalQuoteResponse[];
 }
+
+export interface InternalQuoteUsageResponse {
+  inUse: boolean;
+}
+
+export interface InternalQuoteUsageDataResponse {
+  data: InternalQuoteUsageResponse;
+}

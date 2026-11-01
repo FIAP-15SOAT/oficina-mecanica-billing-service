@@ -280,6 +280,60 @@ describe('Internal quote routes (E2E)', () => {
     });
   });
 
+  describe('GET /internal/{services,parts-supplies}/:id/quote-usage', () => {
+    it('should answer inUse true for a service a quote uses, matching the fixture', async () => {
+      const service = stubService(stub);
+
+      await request(httpServer)
+        .post('/internal/quotes')
+        .send({ workOrderId: randomUUID(), services: [{ serviceId: service.id, quantity: 1 }] })
+        .expect(201);
+
+      const res = await request(httpServer)
+        .get(`/internal/services/${service.id}/quote-usage`)
+        .expect(200);
+
+      expect(res.body).toEqual({ data: { inUse: true } });
+      expect(jsonShape(res.body)).toEqual(jsonShape(readFixture('internal-quote-usage.json')));
+    });
+
+    it('should answer inUse false for a part supply no quote uses', async () => {
+      await createInitialQuote();
+
+      const res = await request(httpServer)
+        .get(`/internal/parts-supplies/${randomUUID()}/quote-usage`)
+        .expect(200);
+
+      expect(res.body).toEqual({ data: { inUse: false } });
+    });
+
+    it('should count a part supply used by a quote outside PENDING', async () => {
+      const partSupply = stubPartSupply(stub);
+
+      const res = await request(httpServer)
+        .post('/internal/quotes')
+        .send({
+          workOrderId: randomUUID(),
+          services: [{ serviceId: stubService(stub).id, quantity: 1 }],
+          partsSupplies: [{ partSupplyId: partSupply.id, quantity: 1 }],
+        })
+        .expect(201);
+
+      await ctx.prisma.quote.update({
+        where: { id: res.body.data.id as string },
+        data: { status: 'REJECTED', rejectedAt: new Date() },
+      });
+
+      await request(httpServer)
+        .get(`/internal/parts-supplies/${partSupply.id}/quote-usage`)
+        .expect(200, { data: { inUse: true } });
+    });
+
+    it('should answer 400 for an item id that is not a UUID', async () => {
+      await request(httpServer).get('/internal/services/not-a-uuid/quote-usage').expect(400);
+    });
+  });
+
   it('should serve the internal routes without token and outside Swagger', async () => {
     const quote = await createInitialQuote();
 

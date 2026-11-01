@@ -238,5 +238,9 @@ describe('QuotePresenter', () => {
       expect(data.map((quote) => quote.id)).toEqual(quotes.map((quote) => quote.id));
       expect('services' in data[0]).toBe(false);
     });
+
+    it('should wrap the item usage in the data envelope', () => {
+      expect(QuotePresenter.toInternalUsageDataResponse(true)).toEqual({ data: { inUse: true } });
+    });
   });
 });
