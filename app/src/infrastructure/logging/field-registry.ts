@@ -52,6 +52,20 @@ function field(
 }
 
 export const LOGICAL_FIELDS: Readonly<Record<LogicalFieldName, LogicalFieldDefinition>> = {
+  quoteId: {
+    key: 'oficina.quote.id',
+    type: 'string',
+    cardinality: 'high',
+    owner: 'use-case',
+    sensitivity: 'identifier',
+  },
+  quoteStatus: {
+    key: 'oficina.quote.status',
+    type: 'string',
+    cardinality: 'fixed',
+    owner: 'use-case',
+    sensitivity: 'clear',
+  },
   workOrderId: {
     key: 'oficina.work_order.id',
     type: 'string',

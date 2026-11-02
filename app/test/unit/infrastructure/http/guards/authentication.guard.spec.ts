@@ -26,7 +26,7 @@ describe('AuthenticationGuard', () => {
     guard = new AuthenticationGuard(reflector, jwtAuthGuard);
   });
 
-  it('allows a route marked public without calling the JWT guard', () => {
+  it('should allow a route marked public without calling the JWT guard', () => {
     reflector.getAllAndOverride.mockReturnValue(true);
     const context = buildContext();
 
@@ -38,7 +38,7 @@ describe('AuthenticationGuard', () => {
     expect(jwtAuthGuard.canActivate).not.toHaveBeenCalled();
   });
 
-  it('delegates every other route to the JWT guard', async () => {
+  it('should delegate every other route to the JWT guard', async () => {
     reflector.getAllAndOverride.mockReturnValue(undefined);
     jwtAuthGuard.canActivate.mockResolvedValue(false);
     const context = buildContext();

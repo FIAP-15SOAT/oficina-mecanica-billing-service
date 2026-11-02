@@ -56,6 +56,8 @@ export interface SetupTestAppOptions {
   controllers?: Type[];
   /** Starts LocalStack with the messaging topology and runs the real relay and consumer. */
   withMessaging?: boolean;
+  /** Base URL of the work order and inventory stub; the default refuses every connection. */
+  internalServicesUrl?: string;
 }
 
 interface LogCaptureSeam {
@@ -142,6 +144,8 @@ export async function setupTestApp(options: SetupTestAppOptions = {}): Promise<T
   process.env.STAFF_JWT_KEY_ID = STAFF_JWT_TEST_KEY_ID;
   process.env.STAFF_JWT_ISSUER = STAFF_JWT_TEST_ISSUER;
   process.env.STAFF_JWT_AUDIENCE = STAFF_JWT_TEST_AUDIENCE;
+  process.env.WORK_ORDER_SERVICE_URL = options.internalServicesUrl ?? 'http://127.0.0.1:9';
+  process.env.INVENTORY_SERVICE_URL = options.internalServicesUrl ?? 'http://127.0.0.1:9';
 
   execSync('npx prisma migrate deploy', {
     env: { ...process.env },

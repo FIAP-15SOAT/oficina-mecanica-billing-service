@@ -18,6 +18,9 @@ import { HealthModule } from './infrastructure/http/controllers/health/health.mo
 import { MessagingModule } from './infrastructure/messaging/messaging.module';
 import { CacheModule } from './infrastructure/cache/cache.module';
 import { ClientsModule } from './infrastructure/clients/clients.module';
+import { GatewaysModule } from './infrastructure/gateways/gateways.module';
+import { QuoteModule } from './infrastructure/http/controllers/quote/quote.module';
+import { InternalModule } from './infrastructure/http/controllers/internal/internal.module';
 
 @Module({
   imports: [
@@ -31,7 +34,10 @@ import { ClientsModule } from './infrastructure/clients/clients.module';
     MessagingModule,
     CacheModule,
     ClientsModule,
+    GatewaysModule,
     HealthModule,
+    QuoteModule,
+    InternalModule,
   ],
   providers: [
     {

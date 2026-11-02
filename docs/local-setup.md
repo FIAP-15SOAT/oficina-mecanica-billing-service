@@ -23,12 +23,16 @@ Cada serviço da solução publica no host as próprias portas, para os stacks l
 
 Só o lado do host muda. Dentro dos containers, a API escuta na 3000 e as URLs entre containers usam as portas padrão (`postgres:5432`, `valkey:6379`, `localstack:4566`). O Valkey e o LocalStack são publicados só em `127.0.0.1`.
 
-| Onde a API roda | URL da API | `DATABASE_URL` | `CACHE_URL` | `AWS_ENDPOINT_URL` |
-|---|---|---|---|---|
-| No container (`docker compose up`) | `http://localhost:3002` | `postgres:5432` (do compose) | `valkey:6379` (do compose) | `http://localstack:4566` (do compose) |
-| Na máquina (`npm run start:dev`) | `http://localhost:3002` | `localhost:5434` (do `.env`) | `localhost:6381` (do `.env`) | `http://localhost:4568` (do `.env`) |
+| Onde a API roda | URL da API | `DATABASE_URL` | `CACHE_URL` | `AWS_ENDPOINT_URL` | `WORK_ORDER_SERVICE_URL` e `INVENTORY_SERVICE_URL` |
+|---|---|---|---|---|---|
+| No container (`docker compose up`) | `http://localhost:3002` | `postgres:5432` (do compose) | `valkey:6379` (do compose) | `http://localstack:4566` (do compose) | `http://host.docker.internal:3000` e `:3003` (do compose) |
+| Na máquina (`npm run start:dev`) | `http://localhost:3002` | `localhost:5434` (do `.env`) | `localhost:6381` (do `.env`) | `http://localhost:4568` (do `.env`) | `http://localhost:3000` e `http://localhost:3003` (do `.env`) |
 
 O `.env.example` já traz os valores da execução na máquina, com `PORT=3002`.
+
+### Work Order e Inventory
+
+Os orçamentos chamam as rotas `/internal` do Work Order (status e resumo da OS) e do Inventory (preço e dados dos itens). Para criar, enviar, aprovar ou ler orçamentos localmente, suba também os stacks desses dois serviços, cada um no próprio repositório: o Work Order publica a API na 3000 e o Inventory na 3003. O container do Billing os alcança pelo host (`host.docker.internal`, declarado no `extra_hosts` do compose). Sem eles, a API sobe e os health checks respondem, mas as rotas de orçamento que consultam a OS ou o catálogo respondem 503.
 
 ## Setup local
 
@@ -115,6 +119,8 @@ O `app/.env.example` tem todas as variáveis com comentários. As obrigatórias 
 | `MESSAGING_TOPIC_ARN` | Sim | `arn:aws:sns:us-east-1:000000000000:oficina-events.fifo` | Tópico onde o relay publica |
 | `CACHE_URL` | Sim | `redis://:valkey@localhost:6381` | Valkey; `rediss://` com senha no cluster |
 | `CACHE_TTL_SECONDS` | Não | `43200` | Validade das entradas; inteiro maior que zero (vazio = 12 h) |
+| `WORK_ORDER_SERVICE_URL` | Sim | `http://localhost:3000` | Origem das rotas `/internal` do Work Order; no cluster, `http://work-order-service.work-order.svc.cluster.local:3000` |
+| `INVENTORY_SERVICE_URL` | Sim | `http://localhost:3003` | Origem das rotas `/internal` do Inventory; no cluster, `http://inventory-service.inventory.svc.cluster.local:3000` |
 | `ALLOWED_ORIGINS` | Não | `http://localhost:3002` | Origens do CORS, separadas por vírgula |
 | `LOG_LEVEL` | Não | `info` | Nível do log |
 | `OTEL_SERVICE_NAME`, `OTEL_SERVICE_NAMESPACE` | Não | `oficina-mecanica-billing-service`, `oficina-mecanica` | Identidade do serviço no log e no trace |

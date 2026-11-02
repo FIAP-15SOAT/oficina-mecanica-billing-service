@@ -30,6 +30,7 @@ describe('PrismaUnitOfWork', () => {
       // Check if repositories are passed
       const repos = mockWork.mock.calls[0][0];
       expect(repos).toHaveProperty('outbox');
+      expect(repos).toHaveProperty('quote');
     });
 
     it('should propagate errors from the work function', async () => {

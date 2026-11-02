@@ -1,0 +1,157 @@
+import { Module } from '@nestjs/common';
+
+import { IQuoteRepository } from '@domain/interfaces/repositories/quote.repository.interface';
+import { IUnitOfWork } from '@domain/interfaces/repositories/unit-of-work.interface';
+
+import { QuoteWorkOrderPolicy } from '@application/policies/quote-work-order.policy';
+import { IInventoryCatalogGateway } from '@application/ports/output/gateways/inventory/inventory-catalog-gateway.interface';
+import { IWorkOrderGateway } from '@application/ports/output/gateways/work-order/work-order-gateway.interface';
+import { ICache } from '@application/ports/output/services/cache.service.interface';
+import { ILogger } from '@application/ports/output/services/logger.service.interface';
+import { QuoteItemValidator } from '@application/services/quote-item-validator';
+import { CreateQuoteUseCase } from '@application/use-cases/quote/create-quote.use-case';
+import { FindQuoteByIdUseCase } from '@application/use-cases/quote/find-quote-by-id.use-case';
+import { AddQuoteServiceUseCase } from '@application/use-cases/quote/add-quote-service.use-case';
+import { RemoveQuoteServiceUseCase } from '@application/use-cases/quote/remove-quote-service.use-case';
+import { AddQuotePartSupplyUseCase } from '@application/use-cases/quote/add-quote-part-supply.use-case';
+import { RemoveQuotePartSupplyUseCase } from '@application/use-cases/quote/remove-quote-part-supply.use-case';
+import { UpdateQuoteServiceQuantityUseCase } from '@application/use-cases/quote/update-quote-service-quantity.use-case';
+import { UpdateQuotePartSupplyQuantityUseCase } from '@application/use-cases/quote/update-quote-part-supply-quantity.use-case';
+import { FindAllQuotesPaginatedUseCase } from '@application/use-cases/quote/find-all-quotes-paginated.use-case';
+import { FindWorkOrderQuotesUseCase } from '@application/use-cases/quote/find-work-order-quotes.use-case';
+import { FindWorkOrdersByIdsUseCase } from '@application/use-cases/quote/find-work-orders-by-ids.use-case';
+import { FindQuoteItemsCatalogUseCase } from '@application/use-cases/quote/find-quote-items-catalog.use-case';
+import { SubmitQuoteUseCase } from '@application/use-cases/quote/submit-quote.use-case';
+import { ApproveQuoteUseCase } from '@application/use-cases/quote/approve-quote.use-case';
+import { RejectQuoteUseCase } from '@application/use-cases/quote/reject-quote.use-case';
+import { UpdateQuoteStatusUseCase } from '@application/use-cases/quote/update-quote-status.use-case';
+import { RevertQuoteApprovalUseCase } from '@application/use-cases/quote/revert-quote-approval.use-case';
+import { CreateInitialQuoteUseCase } from '@application/use-cases/quote/create-initial-quote.use-case';
+import { DeleteQuoteUseCase } from '@application/use-cases/quote/delete-quote.use-case';
+import { DecideQuoteUseCase } from '@application/use-cases/quote/decide-quote.use-case';
+import { CheckServiceQuoteUsageUseCase } from '@application/use-cases/quote/check-service-quote-usage.use-case';
+import { CheckPartSupplyQuoteUsageUseCase } from '@application/use-cases/quote/check-part-supply-quote-usage.use-case';
+
+import { QuoteController as QuoteCleanController } from '@interface-adapters/quote/quote.controller';
+import { InternalQuoteController as InternalQuoteCleanController } from '@interface-adapters/quote/internal-quote.controller';
+
+import { QuoteMessageHandlers } from '@infrastructure/messaging/handlers/quote-message-handlers';
+
+import { QuoteController } from './quote.controller';
+import { WorkOrderQuoteController } from './work-order-quote.controller';
+
+@Module({
+  controllers: [QuoteController, WorkOrderQuoteController],
+  providers: [
+    {
+      provide: QuoteCleanController,
+      useFactory: (
+        unitOfWork: IUnitOfWork,
+        quoteRepository: IQuoteRepository,
+        workOrderGateway: IWorkOrderGateway,
+        inventoryCatalogGateway: IInventoryCatalogGateway,
+        cache: ICache,
+        logger: ILogger,
+      ) => {
+        const quoteWorkOrderPolicy = new QuoteWorkOrderPolicy(workOrderGateway);
+
+        return new QuoteCleanController(
+          new CreateQuoteUseCase(
+            quoteRepository,
+            quoteWorkOrderPolicy,
+            new QuoteItemValidator(inventoryCatalogGateway),
+            cache,
+          ),
+          new FindQuoteByIdUseCase(quoteRepository, cache),
+          new AddQuoteServiceUseCase(quoteRepository, unitOfWork, inventoryCatalogGateway, cache),
+          new RemoveQuoteServiceUseCase(unitOfWork, cache),
+          new AddQuotePartSupplyUseCase(
+            quoteRepository,
+            unitOfWork,
+            inventoryCatalogGateway,
+            cache,
+          ),
+          new RemoveQuotePartSupplyUseCase(unitOfWork, cache),
+          new UpdateQuoteServiceQuantityUseCase(unitOfWork, cache),
+          new UpdateQuotePartSupplyQuantityUseCase(unitOfWork, cache),
+          new SubmitQuoteUseCase(
+            quoteRepository,
+            unitOfWork,
+            quoteWorkOrderPolicy,
+            inventoryCatalogGateway,
+            logger,
+            cache,
+          ),
+          new UpdateQuoteStatusUseCase(
+            quoteRepository,
+            quoteWorkOrderPolicy,
+            new ApproveQuoteUseCase(unitOfWork, quoteWorkOrderPolicy, logger, cache),
+            new RejectQuoteUseCase(unitOfWork, logger, cache),
+          ),
+          new FindAllQuotesPaginatedUseCase(quoteRepository),
+          new FindWorkOrderQuotesUseCase(quoteRepository, cache),
+          new FindWorkOrdersByIdsUseCase(workOrderGateway),
+          new FindQuoteItemsCatalogUseCase(inventoryCatalogGateway),
+        );
+      },
+      inject: [
+        'IUnitOfWork',
+        'IQuoteRepository',
+        'IWorkOrderGateway',
+        'IInventoryCatalogGateway',
+        'ICache',
+        'ILogger',
+      ],
+    },
+    {
+      provide: InternalQuoteCleanController,
+      useFactory: (
+        unitOfWork: IUnitOfWork,
+        quoteRepository: IQuoteRepository,
+        workOrderGateway: IWorkOrderGateway,
+        inventoryCatalogGateway: IInventoryCatalogGateway,
+        cache: ICache,
+        logger: ILogger,
+      ) =>
+        new InternalQuoteCleanController(
+          new CreateInitialQuoteUseCase(
+            quoteRepository,
+            new QuoteItemValidator(inventoryCatalogGateway),
+            cache,
+          ),
+          new DeleteQuoteUseCase(quoteRepository, cache),
+          new FindQuoteByIdUseCase(quoteRepository, cache),
+          new FindWorkOrderQuotesUseCase(quoteRepository, cache),
+          new DecideQuoteUseCase(
+            new ApproveQuoteUseCase(
+              unitOfWork,
+              new QuoteWorkOrderPolicy(workOrderGateway),
+              logger,
+              cache,
+            ),
+            new RejectQuoteUseCase(unitOfWork, logger, cache),
+          ),
+          new FindQuoteItemsCatalogUseCase(inventoryCatalogGateway),
+          new CheckServiceQuoteUsageUseCase(quoteRepository),
+          new CheckPartSupplyQuoteUsageUseCase(quoteRepository),
+        ),
+      inject: [
+        'IUnitOfWork',
+        'IQuoteRepository',
+        'IWorkOrderGateway',
+        'IInventoryCatalogGateway',
+        'ICache',
+        'ILogger',
+      ],
+    },
+    {
+      provide: RevertQuoteApprovalUseCase,
+      useFactory: (unitOfWork: IUnitOfWork, logger: ILogger, cache: ICache) =>
+        new RevertQuoteApprovalUseCase(unitOfWork, logger, cache),
+      inject: ['IUnitOfWork', 'ILogger', 'ICache'],
+    },
+    QuoteMessageHandlers,
+  ],
+  exports: [InternalQuoteCleanController],
+})
+export class QuoteModule {}

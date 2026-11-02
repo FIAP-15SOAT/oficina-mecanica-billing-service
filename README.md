@@ -2,7 +2,7 @@
 
 # 💳 Billing Service
 
-**Orçamentos, cobranças e pagamentos da oficina mecânica.**
+**Orçamentos da oficina mecânica.**
 
 ![Node](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white)
@@ -17,8 +17,12 @@
 
 Projeto acadêmico da pós-graduação em Arquitetura de Software da FIAP (turma 15SOAT). A solução da oficina mecânica é formada pelos serviços Work Order, Identity, Billing e Inventory, cada um dono do próprio banco e do próprio cache, que conversam por REST interno e por mensagens SNS/SQS FIFO publicadas a partir de um outbox transacional.
 
-Este repositório é o **Billing**. Ele será o dono dos orçamentos, das cobranças e dos pagamentos pelo Mercado Pago, que chegam nas próximas entregas. Hoje o serviço está publicado vazio, sem regra de negócio: expõe só os health checks e o Swagger, com o kit comum dos serviços pronto para receber o domínio.
+Este repositório é o **Billing**, dono dos orçamentos da oficina.
 
+- **Orçamentos**: criação condicionada ao status da OS lido no Work Order, itens com o preço congelado lido no Inventory, envio, aprovação e rejeição pelo funcionário e pela decisão do cliente repassada pelo Work Order.
+- **Aprovação síncrona**: a aprovação responde na hora e, na mesma transação, rejeita os outros orçamentos abertos da OS de forma reversível e grava o evento que inicia a Saga de aprovação do Work Order; o comando de reversão desfaz a aprovação e restaura os orçamentos rejeitados por ela.
+- **Eventos**: `billing.quote.sent`, `billing.quote.approved`, `billing.quote.rejected` e `billing.quote.approval_reverted`, publicados pelo outbox; consome `billing.quote.revert_approval`.
+- **Rotas internas** para o Work Order (orçamento inicial da abertura da OS, compensação, leitura e decisão do cliente) e para o Inventory (uso de item em orçamento).
 - **Kit comum**: Clean Architecture com cerca de camadas no ESLint, logs JSON estruturados, OpenTelemetry, health checks, outbox e relay para o SNS, consumidor da fila `billing.fifo`, cache Valkey e cliente HTTP interno.
 - **Autenticação**: só o token de funcionário (JWT RS256 emitido pelo Identity), validado localmente pela chave pública, sem consulta a outro serviço. O token de cliente é recusado.
 - **Entrega**: imagem publicada no Amazon ECR e implantada no Amazon EKS, no namespace `billing`, pelo próprio CD.
@@ -94,6 +98,8 @@ docker compose logs -f api
 docker compose stop
 ```
 
+As rotas de orçamento consultam o Work Order (`http://localhost:3000`) e o Inventory (`http://localhost:3003`): suba os stacks deles para usá-las, como em [Como executar localmente › Work Order e Inventory](docs/local-setup.md#work-order-e-inventory). Sem eles, as que consultam a OS ou o catálogo respondem 503.
+
 As portas no host seguem a tabela por contexto da solução, para o Billing subir junto com os outros serviços: veja [Como executar localmente › Portas locais](docs/local-setup.md#portas-locais). O setup com a API fora do container, as variáveis de ambiente e a chave do token estão no mesmo documento.
 
 ## ⚙️ Comandos
@@ -126,6 +132,18 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 
 ➡️ Detalhes em **[Arquitetura](docs/architecture.md)**.
 
+## 🔌 Rotas
+
+| Grupo | Rotas | Acesso |
+|---|---|---|
+| Orçamentos | `GET`, `POST /api/quotes`; `GET /api/quotes/:id`; `POST`, `PATCH`, `DELETE /api/quotes/:id/services[/:serviceId]` e `/parts-supplies[/:partSupplyId]`; `POST /api/quotes/:id/submissions`; `PATCH /api/quotes/:id` | Token de funcionário; a decisão só para `ADMIN` e `ATTENDANT` |
+| Orçamentos da OS | `GET /api/work-orders/:id/quotes` | Token de funcionário |
+| Internas (Work Order) | `POST /internal/quotes`, `DELETE` e `GET /internal/quotes/:id`, `GET /internal/work-orders/:workOrderId/quotes`, `POST /internal/quotes/:id/decisions` | Rede do cluster, sem token e fora do Swagger |
+| Internas (Inventory) | `GET /internal/services/:serviceId/quote-usage`, `GET /internal/parts-supplies/:partSupplyId/quote-usage` | Rede do cluster, sem token e fora do Swagger |
+| Saúde e documentação | `GET /api/health/live`, `GET /api/health/ready`, `/api/docs` | Sem token |
+
+➡️ Status, corpos, erros e ciclo de vida em **[API](docs/api.md)**; eventos em **[Mensageria](docs/messaging.md)**.
+
 ## 🌐 Ecossistema de repositórios
 
 | Repositório | Responsabilidade |
@@ -156,13 +174,13 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 ├── .zap/                        # Regras do scan do OWASP ZAP
 ├── app/
 │   ├── src/
-│   │   ├── domain/              # Contratos de repositório, catálogo de mensagens e enums
-│   │   ├── application/         # Portas, exceções e catálogos de log e de métricas
-│   │   ├── interface-adapters/  # Clean Controllers e Presenters (vazia por enquanto)
-│   │   └── infrastructure/      # HTTP, persistência, mensageria, cache, clientes, logging e telemetria
+│   │   ├── domain/              # Agregado Quote, value object, enums, contratos de repositório e catálogo de mensagens
+│   │   ├── application/         # Casos de uso, política da OS, validador de itens, portas e catálogos
+│   │   ├── interface-adapters/  # Clean Controllers público e interno e Presenter dos orçamentos
+│   │   └── infrastructure/      # HTTP, persistência, gateways, mensageria, cache, clientes, logging e telemetria
 │   ├── localstack/              # Topologia SNS/SQS criada no LocalStack
 │   ├── prisma/                  # Schema e migrations
-│   ├── test/                    # Unitários, E2E, smoke e helpers
+│   ├── test/                    # Unitários, E2E, smoke, helpers e fixtures de contrato (contracts/)
 │   ├── .env.example             # Referência de configuração local
 │   ├── Dockerfile               # Imagem da API
 │   ├── docker-compose.yml       # Stack local
@@ -171,7 +189,7 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 ├── docs/
 │   ├── adr/                     # Decisões arquiteturais
 │   ├── c4/                      # Diagrama C4 de componentes
-│   └── diagrams/                # Diagramas dos workflows
+│   └── diagrams/                # Diagramas do serviço, das sequências de orçamento e dos workflows
 ├── k8s/                         # Manifests aplicados pelo CD
 ├── .gitignore
 └── README.md
@@ -181,9 +199,12 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 
 | Documento | Conteúdo |
 |---|---|
-| 🏛️ [Arquitetura](docs/architecture.md) | Camadas, cerca, kit comum e diagrama de componentes (C4 nível 3) |
+| 🏛️ [Arquitetura](docs/architecture.md) | Camadas, cerca, domínio dos orçamentos, política da OS, aprovação síncrona, concorrência, integrações, kit comum e C4 nível 3 |
+| 🔌 [API](docs/api.md) | Rotas públicas e internas, ciclo de vida do orçamento, fixtures de contrato e erros |
+| 📨 [Mensageria](docs/messaging.md) | Eventos publicados, comando consumido, idempotência e reversão da aprovação |
+| 🗄️ [Banco de dados](docs/database.md) | Tabelas, índices, colunas de decisão e de restauração, concorrência e cache |
 | 💻 [Como executar localmente](docs/local-setup.md) | Setup local, portas por contexto, chave do token e variáveis de ambiente |
-| 🧪 [Testes](docs/testing.md) | Unitários, E2E com rotas de teste, badge de cobertura e Postman/Newman |
+| 🧪 [Testes](docs/testing.md) | Unitários, E2E, stub do Work Order e do Inventory, contratos, badge de cobertura e Postman/Newman |
 | 🧩 [Modelo C4](docs/c4/README.md) | Diagrama de componentes da API, com a descrição de cada componente |
 | 🔄 [CI/CD](docs/ci-cd.md) | Workflows de CI, CD, SAST e DAST, secrets e variables |
 | 📊 [SonarQube Cloud](https://sonarcloud.io/project/overview?id=FIAP-15SOAT_oficina-mecanica-billing-service) | Quality gate e cobertura do projeto |
@@ -198,6 +219,7 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 | [0004](docs/adr/0004-materializacao-da-credencial-do-banco-no-cd.md) | Materialização da credencial do banco no CD |
 | [0005](docs/adr/0005-mensageria-sns-sqs-fifo-com-outbox.md) | Mensageria SNS/SQS FIFO com outbox transacional |
 | [0006](docs/adr/0006-cache-do-dono-no-elasticache.md) | Cache do dono no ElastiCache |
+| [0007](docs/adr/0007-aprovacao-sincrona-com-irmaos-reversiveis.md) | Aprovação síncrona com irmãos reversíveis |
 
 ## 👥 Autores
 
