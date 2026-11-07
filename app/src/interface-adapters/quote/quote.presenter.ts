@@ -2,7 +2,7 @@ import { Quote } from '@domain/entities/quote.entity';
 import { QuoteService } from '@domain/entities/quote-service.entity';
 import { QuotePartSupply } from '@domain/entities/quote-part-supply.entity';
 import { PaginatedResult } from '@domain/interfaces/common/pagination.interface';
-import { QuoteItemsCatalog } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
+import { QuoteItemsCatalog } from '@application/ports/input/quote/dto/find-quote-items-catalog.dto';
 import {
   InventoryPartSupplyGatewayResponse,
   InventoryServiceGatewayResponse,

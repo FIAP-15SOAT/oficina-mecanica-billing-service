@@ -1,9 +1,7 @@
 import { Quote } from '@domain/entities/quote.entity';
 
-import {
-  IFindQuoteItemsCatalogUseCase,
-  QuoteItemsCatalog,
-} from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
+import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
+import { QuoteItemsCatalog } from '@application/ports/input/quote/dto/find-quote-items-catalog.dto';
 import { IInventoryCatalogGateway } from '@application/ports/output/gateways/inventory/inventory-catalog-gateway.interface';
 
 export class FindQuoteItemsCatalogUseCase implements IFindQuoteItemsCatalogUseCase {

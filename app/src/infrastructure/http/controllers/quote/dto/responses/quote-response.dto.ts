@@ -209,7 +209,7 @@ export class QuoteServiceItemResponseDto implements QuoteServiceItemResponse {
   id!: string;
 
   @ApiPropertyOptional({
-    description: 'Nome do serviço (nulo quando o serviço não existe mais no catálogo)',
+    description: 'Nome do serviço',
     nullable: true,
     example: 'Troca de óleo',
   })
@@ -250,7 +250,7 @@ export class QuotePartSupplyItemResponseDto implements QuotePartSupplyItemRespon
   id!: string;
 
   @ApiPropertyOptional({
-    description: 'Nome da peça/insumo (nulo quando a peça não existe mais no catálogo)',
+    description: 'Nome da peça/insumo',
     nullable: true,
     example: 'Filtro de Óleo',
   })
