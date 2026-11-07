@@ -6,10 +6,8 @@ import { ResourceNotFoundException } from '@application/exceptions/resource-not-
 import { QuoteWorkOrderPolicy } from '@application/policies/quote-work-order.policy';
 import { IApproveQuoteUseCase } from '@application/ports/input/quote/approve-quote.use-case.interface';
 import { IRejectQuoteUseCase } from '@application/ports/input/quote/reject-quote.use-case.interface';
-import {
-  IUpdateQuoteStatusUseCase,
-  UpdateQuoteStatusDto,
-} from '@application/ports/input/quote/update-quote-status.use-case.interface';
+import { IUpdateQuoteStatusUseCase } from '@application/ports/input/quote/update-quote-status.use-case.interface';
+import { UpdateQuoteStatusDto } from '@application/ports/input/quote/dto/update-quote-status.dto';
 
 export class UpdateQuoteStatusUseCase implements IUpdateQuoteStatusUseCase {
   constructor(
