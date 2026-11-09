@@ -21,6 +21,12 @@
       "enabled": true
     },
     {
+      "key": "paymentWorkOrderId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
       "key": "serviceId",
       "value": "3551b3f8-625e-4f2b-b777-a1d0ec4e4585",
       "type": "default",

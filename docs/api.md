@@ -8,6 +8,9 @@
 - [Orçamentos](#orçamentos-apiquotes)
 - [Orçamentos de uma ordem de serviço](#orçamentos-de-uma-ordem-de-serviço)
 - [Ciclo de vida do orçamento](#ciclo-de-vida-do-orçamento)
+- [Cobranças](#cobranças-apipayments)
+- [Ciclo de vida da cobrança](#ciclo-de-vida-da-cobrança)
+- [Webhook do Mercado Pago](#webhook-do-mercado-pago)
 - [Rotas internas](#rotas-internas-internal)
 - [Formato de resposta](#formato-de-resposta)
 - [Erros](#erros)
@@ -15,9 +18,9 @@
 ## Acesso
 
 - **Swagger:** `http://localhost:3002/api/docs`
-- **Base URL:** `http://localhost:3002/api` (local). No cluster, o Billing responde no listener `8082` do NLB interno. Hoje o API Gateway publica do Billing `GET /health/billing` e `GET /docs/billing`, e encaminha `/api/quotes` e `GET /api/work-orders/{id}/quotes` ao Work Order.
+- **Base URL:** `http://localhost:3002/api` (local). No cluster, o Billing responde no listener `8082` do NLB interno. Hoje o API Gateway publica do Billing `GET /health/billing`, `GET /docs/billing` e `POST /webhooks/mercadopago`, e encaminha `/api/quotes`, `GET /api/work-orders/{id}/quotes` e `/api/payments` ao Work Order.
 
-Toda rota de `/api` exige `Authorization: Bearer <token>` com o token RS256 de **funcionário** emitido pelo Identity, validado localmente (assinatura, `kid`, `iss`, `aud`, `exp`, `typ = access` e `role`). Só as rotas de saúde e o Swagger respondem sem token. Token de cliente, expirado ou assinado por outra chave responde **401**; papel sem permissão na rota responde **403**.
+Toda rota de `/api` exige `Authorization: Bearer <token>` com o token RS256 de **funcionário** emitido pelo Identity, validado localmente (assinatura, `kid`, `iss`, `aud`, `exp`, `typ = access` e `role`). Só as rotas de saúde e o Swagger respondem sem token. O webhook do Mercado Pago, fora de `/api`, também não leva token: ele é autenticado pela assinatura `x-signature`. Token de cliente, expirado ou assinado por outra chave responde **401**; papel sem permissão na rota responde **403**.
 
 Os papéis são `ADMIN`, `ATTENDANT` e `MECHANIC`.
 
@@ -103,6 +106,74 @@ Responde **404** quando o Work Order não conhece a OS.
 
 Só orçamento `PENDING` pode ser apagado, e só pela rota interna.
 
+## Cobranças (`/api/payments`)
+
+Uma cobrança pede ao cliente o pagamento de parte ou de todo o orçamento aprovado da OS, pelo Checkout Pro do Mercado Pago (a página de pagamento hospedada pelo Mercado Pago, que aceita Pix, cartão e boleto). O fluxo completo está em [Arquitetura › Cobranças com o Mercado Pago](architecture.md#cobranças-com-o-mercado-pago).
+
+| Método | Rota | Descrição | Papéis | Respostas |
+| --- | --- | --- | --- | --- |
+| GET | `/` | Listar paginado, mais recentes primeiro (filtros `workOrderId` e `status`) | ADMIN, ATTENDANT, MECHANIC | 200, 400 |
+| POST | `/` | Criar cobrança de uma OS e o link de pagamento | ADMIN, ATTENDANT, MECHANIC | 201, 400, 404, 409, 422, 503 |
+| GET | `/:id` | Detalhar | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404 |
+| POST | `/:id/cancellations` | Cancelar cobrança pendente | ADMIN, ATTENDANT, MECHANIC | 200, 400, 404, 409, 503 |
+
+As rotas leem sempre o banco: as cobranças não usam cache, porque o status muda pelo webhook.
+
+### Criação (`POST /api/payments`)
+
+Corpo: `workOrderId` (UUID) e `amount` (número com até duas casas decimais).
+
+| Conferência | Resposta |
+| --- | --- |
+| A OS, lida em `GET /internal/work-orders/:id` do Work Order, existe | **404** sem OS; **503** com o Work Order fora do ar |
+| A OS está em `APPROVED` ou `COMPLETED` | **409** "Cobrança só pode ser criada com a Ordem de Serviço em um dos seguintes status: APPROVED ou COMPLETED. Status atual: ..." |
+| A OS não tem cobrança `PENDING` | **409** "A ordem de serviço já tem uma cobrança pendente" |
+| O valor é maior que zero | **422** "O valor da cobrança deve ser maior que zero" |
+| O valor não passa do saldo (total do orçamento aprovado menos as cobranças `APPROVED`) | **422** "O valor da cobrança não pode ser maior que o saldo da ordem de serviço. Saldo atual: ..." |
+| O Mercado Pago cria a order | **503** "Não foi possível criar a cobrança no Mercado Pago. Nada foi gravado; tente novamente" |
+
+Nenhuma conferência que falha chama o Mercado Pago, e nenhuma falha grava a cobrança. Aceita, a cobrança nasce `PENDING`, `billing.payment.requested` vai para o outbox na mesma transação ([Mensageria](messaging.md#eventos-publicados)) e a resposta é **201** com o link de pagamento em `checkoutUrl`. O Billing não manda o link ao cliente: o evento leva o link ao Work Order. Duas criações simultâneas para a mesma OS deixam uma só cobrança `PENDING`, e a outra responde **409**.
+
+### Cancelamento (`POST /api/payments/:id/cancellations`)
+
+Sem corpo. Cancela a order no Mercado Pago e responde pelo resultado:
+
+| Situação | Cobrança | Resposta |
+| --- | --- | --- |
+| Cobrança `PENDING` e order cancelada | `CANCELLED`, com `billing.payment.failed` (`CANCELLED`) | **200** com a cobrança |
+| Cancelamento recusado e order já encerrada sem pagamento (`expired`, `canceled` ou `failed`) | `EXPIRED`, `CANCELLED` ou `REJECTED`, com `billing.payment.failed` e o motivo | **200** com a cobrança |
+| Cancelamento recusado e order paga (`processed`) | `APPROVED`, com `billing.payment.approved` | **409** "A cobrança não pode ser cancelada porque já foi paga" |
+| Cancelamento recusado com pagamento iniciado pelo cliente e não concluído | Continua `PENDING`, sem evento | **409** "A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente no provedor de pagamento não for concluído. Ela será encerrada quando esse pagamento for confirmado ou expirar" |
+| Cobrança fora de `PENDING` | Não muda | **409** "Cobrança só pode ser cancelada no status PENDING. Status atual: ..." |
+| Cobrança inexistente | — | **404** |
+| Mercado Pago fora do ar | Não muda | **503** "Não foi possível cancelar a order no Mercado Pago. Nada mudou; tente novamente" ou "Não foi possível consultar a order no Mercado Pago. Tente novamente" |
+
+O mesmo cancelamento atende ao comando `billing.payment.cancel` ([Mensageria › Comandos consumidos](messaging.md#comandos-consumidos)).
+
+### Resposta
+
+A cobrança traz `id`, `workOrderId`, `checkoutId` (o id da order no Mercado Pago), `amount`, `status`, `checkoutUrl` (o link de pagamento), `expiresAt`, `createdAt` e `updatedAt`. A listagem usa o envelope paginado; criação, detalhe e cancelamento, `{ data }`.
+
+## Ciclo de vida da cobrança
+
+| De | Para | Por |
+| --- | --- | --- |
+| — | `PENDING` | Criação (`POST /api/payments`) |
+| `PENDING` | `APPROVED` | Webhook com a order paga, ou cancelamento recusado com a order paga |
+| `PENDING` | `EXPIRED` | Webhook com a order expirada, ou cancelamento recusado com a order expirada |
+| `PENDING` | `CANCELLED` | Cancelamento pela rota ou pelo comando `billing.payment.cancel`, ou webhook com a order cancelada |
+| `PENDING` | `REJECTED` | Webhook com a order recusada (`failed`), ou cancelamento recusado com a order recusada |
+
+`APPROVED`, `EXPIRED`, `CANCELLED` e `REJECTED` são finais: nenhuma rota, mensagem ou notificação muda uma cobrança encerrada. Estorno e chargeback de uma cobrança `APPROVED` são só registrados no log (`payment.checkout_reversed`).
+
+## Webhook do Mercado Pago
+
+| Método | Rota | Quem chama | Respostas |
+| --- | --- | --- | --- |
+| POST | `/webhooks/mercadopago?data.id=<id da order>` | Mercado Pago, a cada mudança de uma order | 200, 401, 409, 503 |
+
+Fora do prefixo `api`, sem token e fora do Swagger. O cabeçalho `x-signature` (`ts=<instante>,v1=<hash>`) é validado com a chave secreta do webhook sobre o `data.id` em minúsculas, o `x-request-id` e o `ts`; assinatura inválida, `ts` ausente e `data.id` ausente respondem **401** "Assinatura do webhook inválida". Válida, o Billing consulta a order e encerra a cobrança `PENDING` se a order estiver encerrada; responde **200** depois de processar, inclusive para uma notificação repetida, de cobrança encerrada ou de order desconhecida, que não mudam nada. **503** (Mercado Pago fora do ar na consulta) e **409** (outra escrita encerrou a cobrança ao mesmo tempo) fazem o Mercado Pago repetir a notificação. O corpo enviado pelo Mercado Pago não é lido: só a order consultada vale.
+
 ## Rotas internas (`/internal`)
 
 Sem o prefixo `api`, sem token e fora do Swagger: só o tráfego dentro do cluster alcança, e o API Gateway não as publica. Toda chamada leva `x-request-id` e `traceparent`. Ids que não são UUID respondem **400**.
@@ -116,6 +187,8 @@ Sem o prefixo `api`, sem token e fora do Swagger: só o tráfego dentro do clust
 | POST | `/internal/quotes/:id/decisions` | Work Order, pela decisão do cliente | Aprova ou rejeita | 200, 400, 404, 409, 503 |
 | GET | `/internal/services/:serviceId/quote-usage` | Inventory, antes de excluir um serviço | Se algum orçamento usa o serviço | 200 |
 | GET | `/internal/parts-supplies/:partSupplyId/quote-usage` | Inventory, antes de excluir uma peça | Se algum orçamento usa a peça | 200 |
+| GET | `/internal/work-orders/:workOrderId/payments` | Work Order | Cobranças da OS, em qualquer status, da mais antiga para a mais nova | 200 |
+| GET | `/internal/work-orders/:workOrderId/balance` | Work Order | Saldo da OS | 200 |
 
 As respostas internas trazem `workOrderId`, `decidedBy` e `rejectionReason` no lugar do resumo `workOrder` da rota pública, e não consultam o Work Order: assim o Work Order chama o Billing sem que o Billing chame o Work Order de volta. Os itens do detalhe interno trazem os dados de exibição do Inventory, como na rota pública, então o detalhe responde **503** com o Inventory fora do ar.
 
@@ -137,6 +210,16 @@ Corpo: `action` (`approve` ou `reject`), `reason` (até 500 caracteres, obrigat�
 
 Responde `{ "data": { "inUse": true } }` quando algum orçamento, em qualquer status, tem o serviço ou a peça; senão `inUse` é `false`.
 
+### Cobranças e saldo da OS
+
+`GET /internal/work-orders/:workOrderId/payments` responde `{ data: [...] }`, sem paginação, com as cobranças no formato da rota pública. `GET /internal/work-orders/:workOrderId/balance` responde os valores em texto com duas casas, para quem lê não somar em ponto flutuante:
+
+```json
+{ "data": { "approvedTotal": "500.00", "paidTotal": "100.00", "balance": "400.00" } }
+```
+
+`approvedTotal` é o total do orçamento `APPROVED` da OS (zero sem orçamento aprovado), `paidTotal` a soma das cobranças `APPROVED` e `balance` a diferença. Uma cobrança `PENDING` não entra no `paidTotal`. OS sem orçamento nem cobrança responde a lista vazia e o saldo zero, sem 404: o Billing não consulta o Work Order nessas rotas.
+
 ### Fixtures de contrato
 
 As respostas internas estão versionadas em [`app/test/contracts/`](../app/test/contracts/), e os E2E comparam a resposta real com elas:
@@ -147,12 +230,14 @@ As respostas internas estão versionadas em [`app/test/contracts/`](../app/test/
 | `internal-quote-summary.json` | `POST /internal/quotes` |
 | `internal-work-order-quotes.json` | `GET /internal/work-orders/:workOrderId/quotes` |
 | `internal-quote-usage.json` | `GET /internal/{services,parts-supplies}/:id/quote-usage` |
+| `internal-work-order-payments.json` | `GET /internal/work-orders/:workOrderId/payments` |
+| `internal-work-order-balance.json` | `GET /internal/work-orders/:workOrderId/balance` |
 
 As rotas que o Billing consome têm as fixtures dos donos copiadas em `app/test/contracts/work-order/` e `app/test/contracts/inventory/` ([Testes](testing.md#contratos-com-outros-serviços)).
 
 ## Formato de resposta
 
-Recurso único em `{ data: ... }`; lista paginada em `{ data: [...], pagination: { totalRecords, totalPages, page, limit } }`. `page` tem padrão 1 e mínimo 1; `limit` tem padrão 10, mínimo 1 e máximo 100. Valores monetários saem como número (`219.9`), gravados em `DECIMAL(10,2)`. Datas saem em ISO 8601 com fuso. As rotas de saúde (`/api/health/live` e `/api/health/ready`) devolvem só `{ "status": "ok" }` ou `{ "status": "unavailable" }`.
+Recurso único em `{ data: ... }`; lista paginada em `{ data: [...], pagination: { totalRecords, totalPages, page, limit } }`. `page` tem padrão 1 e mínimo 1; `limit` tem padrão 10, mínimo 1 e máximo 100. Valores monetários saem como número (`219.9`), gravados em `DECIMAL(10,2)`; só o saldo interno sai em texto com duas casas. Datas saem em ISO 8601 com fuso. As rotas de saúde (`/api/health/live` e `/api/health/ready`) devolvem só `{ "status": "ok" }` ou `{ "status": "unavailable" }`.
 
 ## Erros
 
@@ -161,9 +246,9 @@ O corpo é `{ "statusCode": 409, "error": "Conflict", "message": "..." }`, com m
 | Status | Quando |
 | --- | --- |
 | 400 | Formato inválido no corpo, na query ou no id (`message` em lista na validação de DTO); rejeição sem motivo |
-| 401 | Sem token, token inválido ou token de cliente |
+| 401 | Sem token, token inválido ou token de cliente; no webhook, assinatura inválida |
 | 403 | Papel sem permissão na rota |
-| 404 | Orçamento, item do orçamento, OS (no Work Order) ou item do catálogo (no Inventory) inexistente |
-| 409 | Regra de negócio violada (status do orçamento ou da OS, orçamento `APPROVED` na OS, peça sem serviço, item repetido) e conflito de versão em escrita concorrente; repita a chamada depois de reler |
-| 422 | Dado de domínio inválido, como item com preço não positivo no catálogo |
-| 503 | Work Order ou Inventory fora do ar, sem resposta em 2 s ou com erro inesperado; nada é gravado |
+| 404 | Orçamento, item do orçamento, cobrança, OS (no Work Order) ou item do catálogo (no Inventory) inexistente |
+| 409 | Regra de negócio violada (status do orçamento, da cobrança ou da OS, orçamento `APPROVED` na OS, peça sem serviço, item repetido, cobrança pendente na OS, cancelamento de cobrança paga ou em pagamento) e conflito de versão em escrita concorrente; repita a chamada depois de reler |
+| 422 | Dado de domínio inválido, como item com preço não positivo no catálogo ou cobrança com valor zero ou acima do saldo |
+| 503 | Work Order ou Inventory fora do ar, sem resposta em 2 s ou com erro inesperado; Mercado Pago sem credencial, sem resposta em 5 s ou com erro inesperado; nada é gravado |

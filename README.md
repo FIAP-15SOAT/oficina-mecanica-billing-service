@@ -2,7 +2,7 @@
 
 # 💳 Billing Service
 
-**Orçamentos da oficina mecânica.**
+**Orçamentos e cobranças da oficina mecânica.**
 
 ![Node](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
 ![NestJS](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white)
@@ -17,14 +17,16 @@
 
 Projeto acadêmico da pós-graduação em Arquitetura de Software da FIAP (turma 15SOAT). A solução da oficina mecânica é formada pelos serviços Work Order, Identity, Billing e Inventory, cada um dono do próprio banco e do próprio cache, que conversam por REST interno e por mensagens SNS/SQS FIFO publicadas a partir de um outbox transacional.
 
-Este repositório é o **Billing**, dono dos orçamentos da oficina.
+Este repositório é o **Billing**, dono dos orçamentos e das cobranças da oficina.
 
 - **Orçamentos**: criação condicionada ao status da OS lido no Work Order, itens com o preço congelado lido no Inventory, envio, aprovação e rejeição pelo funcionário e pela decisão do cliente repassada pelo Work Order.
 - **Aprovação síncrona**: a aprovação responde na hora e, na mesma transação, rejeita os outros orçamentos abertos da OS de forma reversível e grava o evento que inicia a Saga de aprovação do Work Order; o comando de reversão desfaz a aprovação e restaura os orçamentos rejeitados por ela.
-- **Eventos**: `billing.quote.sent`, `billing.quote.approved`, `billing.quote.rejected` e `billing.quote.approval_reverted`, publicados pelo outbox; consome `billing.quote.revert_approval`.
-- **Rotas internas** para o Work Order (orçamento inicial da abertura da OS, compensação, leitura e decisão do cliente) e para o Inventory (uso de item em orçamento).
+- **Cobranças**: o funcionário cobra o sinal ou o saldo de uma OS em `APPROVED` ou `COMPLETED`, com no máximo uma cobrança pendente por OS e valor até o saldo (total do orçamento aprovado menos o já pago). O Billing cria a cobrança no Mercado Pago pelo Checkout Pro (a página de pagamento hospedada pelo Mercado Pago, que aceita Pix, cartão e boleto) e devolve o link de pagamento; o cancelamento e o webhook do Mercado Pago, autenticado pela assinatura HMAC e confirmado pela consulta da cobrança no provedor, encerram a cobrança.
+- **Saga de cobrança**: o Billing é o participante da Saga de cobrança orquestrada pelo Work Order: publica o pedido e o desfecho de cada cobrança e atende ao comando de cancelamento.
+- **Eventos**: `billing.quote.sent`, `billing.quote.approved`, `billing.quote.rejected`, `billing.quote.approval_reverted`, `billing.payment.requested`, `billing.payment.approved` e `billing.payment.failed`, publicados pelo outbox; consome `billing.quote.revert_approval` e `billing.payment.cancel`.
+- **Rotas internas** para o Work Order (orçamento inicial da abertura da OS, compensação, leitura e decisão do cliente, cobranças e saldo da OS) e para o Inventory (uso de item em orçamento).
 - **Kit comum**: Clean Architecture com cerca de camadas no ESLint, logs JSON estruturados, OpenTelemetry, health checks, outbox e relay para o SNS, consumidor da fila `billing.fifo`, cache Valkey e cliente HTTP interno.
-- **Autenticação**: só o token de funcionário (JWT RS256 emitido pelo Identity), validado localmente pela chave pública, sem consulta a outro serviço. O token de cliente é recusado.
+- **Autenticação**: só o token de funcionário (JWT RS256 emitido pelo Identity), validado localmente pela chave pública, sem consulta a outro serviço. O token de cliente é recusado. O webhook do Mercado Pago não leva token: ele é autenticado pela assinatura `x-signature`.
 - **Entrega**: imagem publicada no Amazon ECR e implantada no Amazon EKS, no namespace `billing`, pelo próprio CD.
 
 ## 🧰 Stack
@@ -36,6 +38,7 @@ Este repositório é o **Billing**, dono dos orçamentos da oficina.
 - **Mensageria**: Amazon SNS FIFO + SQS FIFO (`@aws-sdk/client-sns`, `@aws-sdk/client-sqs`, `sqs-consumer`), com outbox transacional no PostgreSQL; LocalStack 4.14.0 em desenvolvimento
 - **Cache**: Valkey 9.1 (Amazon ElastiCache no cluster) via `ioredis`
 - **Chamadas internas**: REST pela rede do cluster, com `@nestjs/axios`
+- **Pagamentos**: Mercado Pago Checkout Pro pela Orders API (a API de orders, como o Mercado Pago chama a cobrança), chamada pelo `@nestjs/axios`; o SDK `mercadopago` 3.6.1 só valida a assinatura do webhook
 - **Autenticação**: `passport-jwt` com o token de funcionário RS256
 - **Observabilidade**: logs JSON no stdout com `pino` + `nestjs-pino`, traces e métricas pelo SDK do OpenTelemetry (desligado com o endpoint vazio), coletados pelo Datadog no cluster
 - **Documentação da API**: Swagger/OpenAPI em `/api/docs`
@@ -100,7 +103,22 @@ docker compose stop
 
 As rotas de orçamento consultam o Work Order (`http://localhost:3000`) e o Inventory (`http://localhost:3003`): suba os stacks deles para usá-las, como em [Como executar localmente › Work Order e Inventory](docs/local-setup.md#work-order-e-inventory). Sem eles, as que consultam a OS ou o catálogo respondem 503.
 
+As rotas de cobrança chamam o Mercado Pago com as credenciais de teste do `app/.env` (`MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET`). Sem elas, a API sobe e essas rotas respondem 503: veja [Como executar localmente › Mercado Pago](docs/local-setup.md#mercado-pago).
+
 As portas no host seguem a tabela por contexto da solução, para o Billing subir junto com os outros serviços: veja [Como executar localmente › Portas locais](docs/local-setup.md#portas-locais). O setup com a API fora do container, as variáveis de ambiente e a chave do token estão no mesmo documento.
+
+## 🔐 Segredos necessários
+
+Nenhum segredo é versionado. Cada ambiente recebe os seus de um lugar só:
+
+| Segredo | Local | Cluster |
+|---|---|---|
+| Chave pública do token de funcionário (`STAFF_JWT_PUBLIC_KEY` e `STAFF_JWT_KEY_ID`) | Gerada no setup e gravada no `app/.env` | Secrets da organização no GitHub, aplicados pelo CD no Secret `jwt-public-keys` |
+| Access token do Mercado Pago (`MERCADOPAGO_ACCESS_TOKEN`) e chave secreta do webhook (`MERCADOPAGO_WEBHOOK_SECRET`) | Credenciais de teste da aplicação no Mercado Pago, no `app/.env` | Secrets do repositório no environment `production`, aplicados pelo CD no Secret `mercadopago` |
+| Conexão do banco (`DATABASE_URL`) e do cache (`CACHE_URL`) | Valores locais do `.env.example` | Lidas pelo CD no AWS Secrets Manager e aplicadas nos Secrets `database-credentials` e `cache-credentials` |
+| Credenciais AWS do CD (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e `AWS_SESSION_TOKEN`) | — | Secrets da organização no GitHub |
+
+O access token e a chave do webhook ficam só no Billing: nenhum outro serviço os recebe, e o log os remove pelo nome do campo. Os secrets estão em [CI/CD › Secrets e variables](docs/ci-cd.md#secrets-e-variables), e as contas de teste e o painel do Mercado Pago, no [Runbook do Mercado Pago](docs/runbook.md).
 
 ## ⚙️ Comandos
 
@@ -138,7 +156,9 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 |---|---|---|
 | Orçamentos | `GET`, `POST /api/quotes`; `GET /api/quotes/:id`; `POST`, `PATCH`, `DELETE /api/quotes/:id/services[/:serviceId]` e `/parts-supplies[/:partSupplyId]`; `POST /api/quotes/:id/submissions`; `PATCH /api/quotes/:id` | Token de funcionário; a decisão só para `ADMIN` e `ATTENDANT` |
 | Orçamentos da OS | `GET /api/work-orders/:id/quotes` | Token de funcionário |
-| Internas (Work Order) | `POST /internal/quotes`, `DELETE` e `GET /internal/quotes/:id`, `GET /internal/work-orders/:workOrderId/quotes`, `POST /internal/quotes/:id/decisions` | Rede do cluster, sem token e fora do Swagger |
+| Cobranças | `GET`, `POST /api/payments`; `GET /api/payments/:id`; `POST /api/payments/:id/cancellations` | Token de funcionário |
+| Webhook do Mercado Pago | `POST /webhooks/mercadopago` | Sem token, com a assinatura `x-signature`; fora do Swagger |
+| Internas (Work Order) | `POST /internal/quotes`, `DELETE` e `GET /internal/quotes/:id`, `GET /internal/work-orders/:workOrderId/quotes`, `POST /internal/quotes/:id/decisions`, `GET /internal/work-orders/:workOrderId/payments`, `GET /internal/work-orders/:workOrderId/balance` | Rede do cluster, sem token e fora do Swagger |
 | Internas (Inventory) | `GET /internal/services/:serviceId/quote-usage`, `GET /internal/parts-supplies/:partSupplyId/quote-usage` | Rede do cluster, sem token e fora do Swagger |
 | Saúde e documentação | `GET /api/health/live`, `GET /api/health/ready`, `/api/docs` | Sem token |
 
@@ -171,12 +191,12 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 ├── .github/
 │   ├── actions/setup-ci/        # Node, npm ci e prisma generate para os jobs
 │   └── workflows/               # CI, CD, SAST e DAST
-├── .zap/                        # Regras do scan do OWASP ZAP
+├── .zap/                        # Regras do scan do OWASP ZAP e stubs do Work Order, do Inventory e do Mercado Pago usados no DAST
 ├── app/
 │   ├── src/
-│   │   ├── domain/              # Agregado Quote, value object, enums, contratos de repositório e catálogo de mensagens
-│   │   ├── application/         # Casos de uso, política da OS, validador de itens, portas e catálogos
-│   │   ├── interface-adapters/  # Clean Controllers público e interno e Presenter dos orçamentos
+│   │   ├── domain/              # Agregados Quote e Payment, value object, enums, contratos de repositório e catálogo de mensagens
+│   │   ├── application/         # Casos de uso, política da OS, validador de itens, leitor de saldo, portas e catálogos
+│   │   ├── interface-adapters/  # Clean Controllers e Presenters dos orçamentos e das cobranças
 │   │   └── infrastructure/      # HTTP, persistência, gateways, mensageria, cache, clientes, logging e telemetria
 │   ├── localstack/              # Topologia SNS/SQS criada no LocalStack
 │   ├── prisma/                  # Schema e migrations
@@ -184,12 +204,13 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 │   ├── .env.example             # Referência de configuração local
 │   ├── Dockerfile               # Imagem da API
 │   ├── docker-compose.yml       # Stack local
+│   ├── docker-compose.dast.yml  # Override do DAST, com os stubs dos outros serviços e do Mercado Pago
 │   └── package.json             # Dependências e comandos npm
 ├── collections/                 # Collection e environment do Postman
 ├── docs/
 │   ├── adr/                     # Decisões arquiteturais
 │   ├── c4/                      # Diagrama C4 de componentes
-│   └── diagrams/                # Diagramas do serviço, das sequências de orçamento e dos workflows
+│   └── diagrams/                # Diagramas do serviço, das sequências de orçamento e de cobrança e dos workflows
 ├── k8s/                         # Manifests aplicados pelo CD
 ├── .gitignore
 └── README.md
@@ -199,14 +220,15 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 
 | Documento | Conteúdo |
 |---|---|
-| 🏛️ [Arquitetura](docs/architecture.md) | Camadas, cerca, domínio dos orçamentos, política da OS, aprovação síncrona, concorrência, integrações, kit comum e C4 nível 3 |
-| 🔌 [API](docs/api.md) | Rotas públicas e internas, ciclo de vida do orçamento, fixtures de contrato e erros |
-| 📨 [Mensageria](docs/messaging.md) | Eventos publicados, comando consumido, idempotência e reversão da aprovação |
-| 🗄️ [Banco de dados](docs/database.md) | Tabelas, índices, colunas de decisão e de restauração, concorrência e cache |
-| 💻 [Como executar localmente](docs/local-setup.md) | Setup local, portas por contexto, chave do token e variáveis de ambiente |
-| 🧪 [Testes](docs/testing.md) | Unitários, E2E, stub do Work Order e do Inventory, contratos, badge de cobertura e Postman/Newman |
+| 🏛️ [Arquitetura](docs/architecture.md) | Camadas, cerca, domínio dos orçamentos e das cobranças, política da OS, aprovação síncrona, cobranças com o Mercado Pago, concorrência, integrações, kit comum e C4 nível 3 |
+| 🔌 [API](docs/api.md) | Rotas públicas e internas, webhook, ciclos de vida do orçamento e da cobrança, fixtures de contrato e erros |
+| 📨 [Mensageria](docs/messaging.md) | Eventos publicados, comandos consumidos, idempotência, reversão da aprovação e cancelamento da cobrança |
+| 🗄️ [Banco de dados](docs/database.md) | Tabelas, índices, colunas de decisão e de restauração, cobranças, concorrência e cache |
+| 💻 [Como executar localmente](docs/local-setup.md) | Setup local, portas por contexto, chave do token, Mercado Pago e variáveis de ambiente |
+| 🧪 [Testes](docs/testing.md) | Unitários, E2E, stubs do Work Order, do Inventory e do Mercado Pago, contratos, badge de cobertura e Postman/Newman |
+| 🛠️ [Runbook do Mercado Pago](docs/runbook.md) | Contas de teste, URL do webhook no painel, troca da chave, cartões de teste e cobrança presa |
 | 🧩 [Modelo C4](docs/c4/README.md) | Diagrama de componentes da API, com a descrição de cada componente |
-| 🔄 [CI/CD](docs/ci-cd.md) | Workflows de CI, CD, SAST e DAST, secrets e variables |
+| 🔄 [CI/CD](docs/ci-cd.md) | Workflows de CI, CD, SAST e DAST, secrets e variables, inclusive os do Mercado Pago |
 | 📊 [SonarQube Cloud](https://sonarcloud.io/project/overview?id=FIAP-15SOAT_oficina-mecanica-billing-service) | Quality gate e cobertura do projeto |
 
 ### Decisões de arquitetura (ADRs)
@@ -220,6 +242,8 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 | [0005](docs/adr/0005-mensageria-sns-sqs-fifo-com-outbox.md) | Mensageria SNS/SQS FIFO com outbox transacional |
 | [0006](docs/adr/0006-cache-do-dono-no-elasticache.md) | Cache do dono no ElastiCache |
 | [0007](docs/adr/0007-aprovacao-sincrona-com-irmaos-reversiveis.md) | Aprovação síncrona com irmãos reversíveis |
+| [0008](docs/adr/0008-checkout-pro-via-orders-api.md) | Checkout Pro via Orders API, atrás de uma porta neutra |
+| [0009](docs/adr/0009-webhook-com-hmac-e-consulta-da-order.md) | Webhook com HMAC e consulta da order, sem reconciliador |
 
 ## 👥 Autores
 

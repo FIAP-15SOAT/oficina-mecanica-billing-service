@@ -1412,6 +1412,562 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "Cobranças",
+      "item": [
+        {
+          "name": "Criar cobrança acima do saldo (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('Mensagem de erro esperada', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(422); pm.expect(res.message).to.include('maior que o saldo'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{paymentWorkOrderId}}\",\n  \"amount\": 99999999\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar cobrança com valor zero (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 Unprocessable Entity', () => pm.response.to.have.status(422));",
+                  "pm.test('Mensagem de erro esperada', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(422); pm.expect(res.message).to.include('maior que zero'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{paymentWorkOrderId}}\",\n  \"amount\": 0\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar cobrança com três casas decimais (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Erros de validação em lista', () => pm.expect(pm.response.json().message).to.be.an('array').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{paymentWorkOrderId}}\",\n  \"amount\": 10.005\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar cobrança com a OS fora de APPROVED e COMPLETED (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Mensagem de erro esperada', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.include('APPROVED ou COMPLETED'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{workOrderId}}\",\n  \"amount\": 100\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar cobrança (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Envelope { data } com a cobrança PENDING e o link de pagamento', () => { const res = pm.response.json(); pm.expect(res.data.status).to.eql('PENDING'); pm.expect(res.data.workOrderId).to.eql(pm.environment.get('paymentWorkOrderId')); pm.expect(res.data.amount).to.eql(100); pm.expect(res.data.checkoutId).to.not.be.empty; pm.expect(res.data.checkoutUrl).to.match(/^https:\\/\\//); pm.expect(res.data).to.have.property('expiresAt'); });",
+                  "pm.collectionVariables.set('paymentId', pm.response.json().data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{paymentWorkOrderId}}\",\n  \"amount\": 100\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar segunda cobrança pendente (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Mensagem de erro esperada', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.include('cobrança pendente'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{paymentWorkOrderId}}\",\n  \"amount\": 50\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalhar a cobrança (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com a cobrança criada', () => { const res = pm.response.json(); pm.expect(res.data.id).to.eql(pm.collectionVariables.get('paymentId')); pm.expect(res.data.status).to.eql('PENDING'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/{{paymentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{paymentId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar paginado (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data, pagination }', () => { const res = pm.response.json(); pm.expect(res.data).to.be.an('array'); pm.expect(res.pagination).to.include.keys('totalRecords', 'totalPages', 'page', 'limit'); pm.expect(res.pagination.page).to.eql(1); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Filtrar por OS e status (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Só a cobrança PENDING da OS', () => { const res = pm.response.json(); pm.expect(res.data).to.have.lengthOf(1); pm.expect(res.data[0].id).to.eql(pm.collectionVariables.get('paymentId')); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments?workOrderId={{paymentWorkOrderId}}&status=PENDING",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "workOrderId",
+                  "value": "{{paymentWorkOrderId}}"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Filtrar por status inválido (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Erros de validação em lista', () => pm.expect(pm.response.json().message).to.be.an('array').and.not.empty);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments?status=PAID",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PAID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar a cobrança (200)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope { data } com a cobrança CANCELLED', () => { const res = pm.response.json(); pm.expect(res.data.id).to.eql(pm.collectionVariables.get('paymentId')); pm.expect(res.data.status).to.eql('CANCELLED'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/{{paymentId}}/cancellations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{paymentId}}",
+                "cancellations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar cobrança já cancelada (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Mensagem de erro esperada', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.include('status PENDING'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/{{paymentId}}/cancellations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "{{paymentId}}",
+                "cancellations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalhar cobrança inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Corpo de erro com statusCode 404 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(404); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar cobrança inexistente (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Corpo de erro com statusCode 404 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(404); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10/cancellations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "5a0e3b6c-1f2d-4c8e-9b7a-6d5c4b3a2f10",
+                "cancellations"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar cobrança sem autenticação (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('Corpo de erro com statusCode 401 e mensagem', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(401); pm.expect(res.message).to.not.be.empty; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workOrderId\": \"{{paymentWorkOrderId}}\",\n  \"amount\": 100\n}"
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
@@ -1421,6 +1977,10 @@
     },
     {
       "key": "quoteIdForReject",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
       "value": ""
     }
   ]

@@ -1,12 +1,13 @@
 # 💻 Como executar localmente
 
-Setup com a API na máquina e a infraestrutura no Docker, portas locais, chave do token de funcionário e variáveis de ambiente. Para subir tudo em containers com um comando, veja o Quick Start no [README](../README.md#-quick-start).
+Setup com a API na máquina e a infraestrutura no Docker, portas locais, chave do token de funcionário, Mercado Pago e variáveis de ambiente. Para subir tudo em containers com um comando, veja o Quick Start no [README](../README.md#-quick-start).
 
 ## Índice
 
 - [Portas locais](#portas-locais)
 - [Setup local](#setup-local)
 - [Chave do token de funcionário](#chave-do-token-de-funcionário)
+- [Mercado Pago](#mercado-pago)
 - [Variáveis de ambiente](#variáveis-de-ambiente)
 - [Telemetria e logs em desenvolvimento](#telemetria-e-logs-em-desenvolvimento)
 
@@ -98,6 +99,22 @@ Para aceitar os tokens emitidos por outro serviço local, como o Work Order, use
 
 No cluster, a chave pública e o `kid` vêm de secrets da organização no GitHub, aplicados pelo CD no Secret `jwt-public-keys` (ver [CI/CD › Secrets e variables](ci-cd.md#secrets-e-variables)).
 
+## Mercado Pago
+
+As rotas de cobrança chamam a Orders API do Mercado Pago (a API que cria, consulta e cancela as orders do Checkout Pro, a página de pagamento hospedada pelo Mercado Pago) em `MERCADOPAGO_API_URL`, com o access token `MERCADOPAGO_ACCESS_TOKEN`; o webhook confere a assinatura com a chave secreta `MERCADOPAGO_WEBHOOK_SECRET`. As três variáveis precisam existir, mas podem ficar vazias.
+
+- **Na máquina** (`npm run start:dev`), a API lê as quatro variáveis `MERCADOPAGO_*` do `app/.env`. O `.env.example` traz a URL real (`https://api.mercadopago.com`), a expiração `P1D` e as credenciais vazias.
+- **No compose base** (`app/docker-compose.yml`), o container da API lê do `app/.env` a URL (padrão `https://api.mercadopago.com`), o access token e a chave do webhook, do mesmo jeito que chama os outros serviços pelo host, sem stub. A expiração fica fixa em `P1D`.
+
+Sem credencial, a API sobe saudável e as rotas de cobrança respondem 503, porque o Mercado Pago recusa a chamada sem token. Para criar cobranças de verdade no sandbox, preencha no `app/.env` as credenciais da aplicação da conta vendedora de teste ([Runbook › Contas de teste](runbook.md#contas-de-teste)). O webhook não chega a uma API local: o Mercado Pago só notifica a URL HTTPS cadastrada no painel, que é a do API Gateway.
+
+O override do DAST (`app/docker-compose.dast.yml`) troca o Mercado Pago pelo serviço `mercadopago-stub`, que roda `.zap/mercado-pago-stub.mjs` e responde a criação, a consulta e o cancelamento de orders sem credencial real, com o token `stub-access-token`, a chave `stub-webhook-secret` e o link `https://localhost/checkout/<id>`. O mesmo override sobe o stub do Work Order e do Inventory, que responde a OS em `IN_DIAGNOSIS`: nesse stack a criação de cobrança responde 409, e criar uma cobrança exige uma OS em `APPROVED` ([Testes › Postman / Newman](testing.md#postman--newman)).
+
+```bash
+# Subir o stack com os stubs do DAST, sem credencial real do Mercado Pago
+docker compose -f docker-compose.yml -f docker-compose.dast.yml up -d --build --wait
+```
+
 ## Variáveis de ambiente
 
 O `app/.env.example` tem todas as variáveis com comentários. As obrigatórias impedem a API de subir quando faltam.
@@ -121,6 +138,10 @@ O `app/.env.example` tem todas as variáveis com comentários. As obrigatórias 
 | `CACHE_TTL_SECONDS` | Não | `43200` | Validade das entradas; inteiro maior que zero (vazio = 12 h) |
 | `WORK_ORDER_SERVICE_URL` | Sim | `http://localhost:3000` | Origem das rotas `/internal` do Work Order; no cluster, `http://work-order-service.work-order.svc.cluster.local:3000` |
 | `INVENTORY_SERVICE_URL` | Sim | `http://localhost:3003` | Origem das rotas `/internal` do Inventory; no cluster, `http://inventory-service.inventory.svc.cluster.local:3000` |
+| `MERCADOPAGO_API_URL` | Sim | `https://api.mercadopago.com` | Origem da Orders API do Mercado Pago; o override do DAST aponta para o stub |
+| `MERCADOPAGO_ACCESS_TOKEN` | Sim, pode ficar vazia | vazio | Access token da aplicação no Mercado Pago, enviado como `Bearer`; vazio, as rotas de cobrança respondem 503. No cluster, vem do Secret `mercadopago` |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Sim, pode ficar vazia | vazio | Chave secreta do webhook, do painel do Mercado Pago, que valida a `x-signature`. No cluster, vem do Secret `mercadopago` |
+| `MERCADOPAGO_ORDER_EXPIRATION` | Sim | `P1D` | Validade de cada order, em duração ISO 8601 (`P[nD][T[nH][nM][nS]]`, como `P1D` ou `PT30M`); outro formato impede a API de subir |
 | `ALLOWED_ORIGINS` | Não | `http://localhost:3002` | Origens do CORS, separadas por vírgula |
 | `LOG_LEVEL` | Não | `info` | Nível do log |
 | `OTEL_SERVICE_NAME`, `OTEL_SERVICE_NAMESPACE` | Não | `oficina-mecanica-billing-service`, `oficina-mecanica` | Identidade do serviço no log e no trace |
