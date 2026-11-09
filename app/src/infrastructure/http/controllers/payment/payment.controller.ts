@@ -1,4 +1,13 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -7,7 +16,9 @@ import {
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiProduces,
   ApiServiceUnavailableResponse,
   ApiTags,
@@ -21,7 +32,11 @@ import { RolesGuard } from '@infrastructure/http/guards/roles.guard';
 import { PaymentController as PaymentCleanController } from '@interface-adapters/payment/payment.controller';
 
 import { CreatePaymentRequestDto } from './dto/requests/create-payment-request.dto';
-import { PaymentDataResponseDto } from './dto/responses/payment-response.dto';
+import { FindAllPaymentsQueryDto } from './dto/requests/find-all-payments-query.dto';
+import {
+  PaymentDataResponseDto,
+  PaymentPaginatedResponseDto,
+} from './dto/responses/payment-response.dto';
 
 @ApiTags('Cobranças')
 @ApiProduces('application/json')
@@ -31,6 +46,17 @@ import { PaymentDataResponseDto } from './dto/responses/payment-response.dto';
 @ApiBearerAuth('access-token')
 export class PaymentController {
   constructor(private readonly controller: PaymentCleanController) {}
+
+  @Get()
+  @Roles(UserRole.ADMIN, UserRole.MECHANIC, UserRole.ATTENDANT)
+  @ApiOperation({ summary: 'Listar cobranças paginado' })
+  @ApiOkResponse({ type: PaymentPaginatedResponseDto })
+  @ApiBadRequestResponse({ description: 'Filtros ou paginação inválidos' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso negado' })
+  findAll(@Query() query: FindAllPaymentsQueryDto): Promise<PaymentPaginatedResponseDto> {
+    return this.controller.findAll(query);
+  }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MECHANIC, UserRole.ATTENDANT)
@@ -52,5 +78,18 @@ export class PaymentController {
   @ApiServiceUnavailableResponse({ description: 'Work Order ou Mercado Pago indisponível' })
   create(@Body() request: CreatePaymentRequestDto): Promise<PaymentDataResponseDto> {
     return this.controller.create(request);
+  }
+
+  @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.MECHANIC, UserRole.ATTENDANT)
+  @ApiOperation({ summary: 'Buscar cobrança por ID' })
+  @ApiOkResponse({ type: PaymentDataResponseDto, description: 'Cobrança encontrada' })
+  @ApiBadRequestResponse({ description: 'ID inválido' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso negado' })
+  @ApiNotFoundResponse({ description: 'Cobrança não encontrada' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID da cobrança' })
+  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<PaymentDataResponseDto> {
+    return this.controller.findOne(id);
   }
 }

@@ -1,8 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { PaymentStatus } from '@domain/enums/payment-status.enum';
+import { PaginatedResponseDto } from '@infrastructure/http/common/dto/paginated-response.dto';
 import {
   PaymentDataResponse,
+  PaymentPaginatedResponse,
   PaymentResponse,
 } from '@interface-adapters/payment/responses/payment.response';
 
@@ -55,4 +57,12 @@ export class PaymentResponseDto implements PaymentResponse {
 export class PaymentDataResponseDto implements PaymentDataResponse {
   @ApiProperty({ type: PaymentResponseDto })
   data!: PaymentResponseDto;
+}
+
+export class PaymentPaginatedResponseDto
+  extends PaginatedResponseDto<PaymentResponseDto>
+  implements PaymentPaginatedResponse
+{
+  @ApiProperty({ type: [PaymentResponseDto] })
+  data!: PaymentResponseDto[];
 }

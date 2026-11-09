@@ -11,6 +11,8 @@ import { ILogger } from '@application/ports/output/services/logger.service.inter
 import { IMetrics } from '@application/ports/output/services/metrics.service.interface';
 import { WorkOrderBalanceReader } from '@application/services/work-order-balance-reader';
 import { CreatePaymentUseCase } from '@application/use-cases/payment/create-payment.use-case';
+import { FindAllPaymentsPaginatedUseCase } from '@application/use-cases/payment/find-all-payments-paginated.use-case';
+import { FindPaymentByIdUseCase } from '@application/use-cases/payment/find-payment-by-id.use-case';
 
 import { PaymentController as PaymentCleanController } from '@interface-adapters/payment/payment.controller';
 
@@ -42,6 +44,8 @@ import { PaymentController } from './payment.controller';
             metrics,
             configService.getOrThrow<string>('MERCADOPAGO_ORDER_EXPIRATION'),
           ),
+          new FindPaymentByIdUseCase(paymentRepository),
+          new FindAllPaymentsPaginatedUseCase(paymentRepository),
         ),
       inject: [
         'IUnitOfWork',

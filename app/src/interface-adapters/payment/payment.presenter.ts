@@ -1,6 +1,11 @@
 import { Payment } from '@domain/entities/payment.entity';
+import { PaginatedResult } from '@domain/interfaces/common/pagination.interface';
 
-import { PaymentDataResponse, PaymentResponse } from './responses/payment.response';
+import {
+  PaymentDataResponse,
+  PaymentPaginatedResponse,
+  PaymentResponse,
+} from './responses/payment.response';
 
 export class PaymentPresenter {
   static toResponse(payment: Payment): PaymentResponse {
@@ -19,5 +24,12 @@ export class PaymentPresenter {
 
   static toDataResponse(payment: Payment): PaymentDataResponse {
     return { data: PaymentPresenter.toResponse(payment) };
+  }
+
+  static toPaginatedResponse(result: PaginatedResult<Payment>): PaymentPaginatedResponse {
+    return {
+      data: result.items.map((payment) => PaymentPresenter.toResponse(payment)),
+      pagination: result.pagination,
+    };
   }
 }

@@ -1,4 +1,5 @@
 import { PaymentStatus } from '@domain/enums/payment-status.enum';
+import { PaginationMeta } from '@domain/interfaces/common/pagination.interface';
 
 export interface PaymentResponse {
   id: string;
@@ -14,4 +15,9 @@ export interface PaymentResponse {
 
 export interface PaymentDataResponse {
   data: PaymentResponse;
+}
+
+export interface PaymentPaginatedResponse {
+  data: PaymentResponse[];
+  pagination: PaginationMeta;
 }

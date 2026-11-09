@@ -22,4 +22,16 @@ describe('PaymentPresenter', () => {
       },
     });
   });
+
+  it('should project each payment with the pagination metadata', () => {
+    const payments = [createMockPayment(), createMockPayment()];
+    const pagination = { totalRecords: 2, totalPages: 1, page: 1, limit: 10 };
+
+    const response = PaymentPresenter.toPaginatedResponse({ items: payments, pagination });
+
+    expect(response).toEqual({
+      data: payments.map((payment) => PaymentPresenter.toResponse(payment)),
+      pagination,
+    });
+  });
 });
