@@ -16,7 +16,12 @@ export interface MetricAttributeRegistryEntry {
   cardinality: MetricCardinality;
 }
 
-export const METRIC_REGISTRY: Readonly<Record<BusinessMetricName, MetricRegistryEntry>> = {};
+export const METRIC_REGISTRY: Readonly<Record<BusinessMetricName, MetricRegistryEntry>> = {
+  'payment.requested': {
+    key: 'oficina.payment.requested',
+    aggregation: { type: AggregationType.DEFAULT },
+  },
+};
 
 export const METRIC_ATTRIBUTE_REGISTRY: Readonly<
   Record<MetricAttributeName, MetricAttributeRegistryEntry>

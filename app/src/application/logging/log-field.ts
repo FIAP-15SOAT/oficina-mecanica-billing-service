@@ -2,6 +2,8 @@ export type LogicalFieldName =
   | 'quoteId'
   | 'quoteStatus'
   | 'workOrderId'
+  | 'paymentId'
+  | 'checkoutId'
   | 'port'
   | 'signal'
   | 'dependencyName'

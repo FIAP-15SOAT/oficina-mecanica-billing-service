@@ -28,4 +28,11 @@ export const BUSINESS_EVENTS = {
     message: 'quote approval revert skipped because the quote is not APPROVED',
     level: 'info',
   }),
+  PAYMENT_REQUESTED: defineLogEvent<{ paymentId: string; workOrderId: string; checkoutId: string }>(
+    {
+      name: 'payment.requested',
+      message: 'payment requested with a Mercado Pago checkout',
+      level: 'info',
+    },
+  ),
 } as const;
