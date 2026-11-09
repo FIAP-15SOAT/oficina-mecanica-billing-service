@@ -6,6 +6,7 @@ import { InvalidWebhookSignatureError, WebhookSignatureValidator } from 'mercado
 
 import { ILogger } from '@application/ports/output/services/logger.service.interface';
 import { AuthenticationFailedException } from '@infrastructure/exceptions/authentication-failed.exception';
+import { ServiceIntegrationException } from '@infrastructure/exceptions/service-integration.exception';
 import { TECHNICAL_EVENTS } from '@infrastructure/logging/technical-event.catalog';
 
 type WebhookOutcome = 'valid' | 'invalid_signature';
@@ -27,6 +28,11 @@ export class MercadoPagoSignatureGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
+    // An empty key would accept any signature computed with an empty key too.
+    if (!this.webhookSecret) {
+      throw new ServiceIntegrationException('Webhook do Mercado Pago não configurado');
+    }
+
     const request = context.switchToHttp().getRequest<Request>();
     const dataId = request.query['data.id'];
     // A repeated parameter arrives as an array; it is left out of the manifest, so it fails the check.

@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { WebhookSignatureValidator } from 'mercadopago';
 
 import { AuthenticationFailedException } from '@infrastructure/exceptions/authentication-failed.exception';
+import { ServiceIntegrationException } from '@infrastructure/exceptions/service-integration.exception';
 import { MercadoPagoSignatureGuard } from '@infrastructure/http/guards/mercado-pago-signature.guard';
 import { TECHNICAL_EVENTS } from '@infrastructure/logging/technical-event.catalog';
 
@@ -168,6 +169,32 @@ describe('MercadoPagoSignatureGuard', () => {
     expect(logger.event).toHaveBeenCalledWith(TECHNICAL_EVENTS.PAYMENT_WEBHOOK_INVALID_SIGNATURE, {
       signatureFailureReason: 'SignatureMismatch',
     });
+  });
+
+  it('should answer 503 when the webhook secret is empty, even for a signature made with it', async () => {
+    const signature = signMercadoPagoWebhook({
+      dataId: 'ORD000001',
+      requestId: REQUEST_ID,
+      ts: TS,
+      secret: '',
+    });
+
+    const context = buildContext({
+      headers: { 'x-signature': signature, 'x-request-id': REQUEST_ID },
+      query: { 'data.id': 'ORD000001', type: 'order' },
+    });
+
+    guard = new MercadoPagoSignatureGuard(
+      new ConfigService({ MERCADOPAGO_WEBHOOK_SECRET: '' }),
+      logger,
+    );
+
+    expect(() => guard.canActivate(context)).toThrow(
+      new ServiceIntegrationException('Webhook do Mercado Pago não configurado'),
+    );
+
+    expect(logger.event).not.toHaveBeenCalled();
+    expect(await receivedCounts()).toEqual({});
   });
 
   it('should rethrow a failure that is not a signature error', async () => {

@@ -13,6 +13,6 @@ export const BUSINESS_METRICS = {
     name: 'payment.resolved',
     kind: 'counter',
     unit: '{payment}',
-    description: 'Cobranças encerradas pelo checkout do provedor de pagamento, por status final',
+    description: 'Cobranças encerradas, por status final',
   }),
 } as const;

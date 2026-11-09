@@ -131,6 +131,14 @@ describe('HttpMercadoPagoOrderGateway', () => {
     it.each([
       ['without id', { status: 'created', checkout_url: CHECKOUT_URL }],
       ['without checkout url', { id: ORDER_ID, status: 'created' }],
+      [
+        'with a checkout url that is not https',
+        { id: ORDER_ID, status: 'created', checkout_url: `http://localhost/checkout/${ORDER_ID}` },
+      ],
+      [
+        'with an id longer than 64 characters',
+        { id: 'O'.repeat(65), status: 'created', checkout_url: CHECKOUT_URL },
+      ],
       ['with an empty body', ''],
     ])('should treat a created order %s as unavailable', async (_case, body) => {
       httpService.request.mockReturnValue(of({ data: body } as AxiosResponse));
@@ -232,6 +240,9 @@ describe('HttpMercadoPagoOrderGateway', () => {
     ['no response on create', 'create', undefined, CREATE_MESSAGE],
     ['401 on create', 'create', 401, CREATE_MESSAGE],
     ['409 on create', 'create', 409, CREATE_MESSAGE],
+    ['423 on create', 'create', 423, CREATE_MESSAGE],
+    ['429 on create', 'create', 429, CREATE_MESSAGE],
+    ['500 on create', 'create', 500, CREATE_MESSAGE],
     ['404 on find', 'find', 404, FIND_MESSAGE],
     ['500 on find', 'find', 500, FIND_MESSAGE],
     ['no response on cancel', 'cancel', undefined, CANCEL_MESSAGE],
@@ -254,6 +265,27 @@ describe('HttpMercadoPagoOrderGateway', () => {
       expect(error).toEqual(new ServiceIntegrationException(message));
       expect(error).not.toHaveProperty('cause');
       expect(httpService.request).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([
+    ['find', 'without status', { id: ORDER_ID }, FIND_MESSAGE],
+    ['find', 'with an empty body', '', FIND_MESSAGE],
+    ['find', 'with a null body', null, FIND_MESSAGE],
+    ['cancel', 'without status', { id: ORDER_ID }, CANCEL_MESSAGE],
+  ] as const)(
+    'should treat a %s answer %s as unavailable',
+    async (operation, _case, body, message) => {
+      httpService.request.mockReturnValue(of({ data: body } as AxiosResponse));
+
+      const calls = {
+        find: () => gateway.findCheckoutById(ORDER_ID),
+        cancel: () => gateway.cancelCheckout(ORDER_ID),
+      };
+
+      const error = await calls[operation]().catch((e: unknown) => e);
+
+      expect(error).toEqual(new ServiceIntegrationException(message));
     },
   );
 

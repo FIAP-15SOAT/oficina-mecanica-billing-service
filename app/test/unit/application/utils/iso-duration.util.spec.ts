@@ -10,7 +10,7 @@ describe('parseIsoDurationMs', () => {
     expect(parseIsoDurationMs(duration)).toBe(milliseconds);
   });
 
-  it.each(['1D', 'P', 'PT', 'PT0M', 'P1W'])(
+  it.each(['1D', 'P', 'PT', 'P1DT', 'PT0M', 'P1W'])(
     'should reject an invalid or zero duration (%s)',
     (duration) => {
       expect(() => parseIsoDurationMs(duration)).toThrow(

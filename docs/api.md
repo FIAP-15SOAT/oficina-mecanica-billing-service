@@ -18,7 +18,7 @@
 ## Acesso
 
 - **Swagger:** `http://localhost:3002/api/docs`
-- **Base URL:** `http://localhost:3002/api` (local). No cluster, o Billing responde no listener `8082` do NLB interno. Hoje o API Gateway publica do Billing `GET /health/billing`, `GET /docs/billing` e `POST /webhooks/mercadopago`, e encaminha `/api/quotes`, `GET /api/work-orders/{id}/quotes` e `/api/payments` ao Work Order.
+- **Base URL:** `http://localhost:3002/api` (local). No cluster, o Billing responde no listener `8082` do NLB interno. O API Gateway publica do Billing `GET /health/billing`, `GET /docs/billing`, `POST /webhooks/mercadopago` e `/api/payments`, e encaminha `/api/quotes` e `GET /api/work-orders/{id}/quotes` ao Work Order.
 
 Toda rota de `/api` exige `Authorization: Bearer <token>` com o token RS256 de **funcionário** emitido pelo Identity, validado localmente (assinatura, `kid`, `iss`, `aud`, `exp`, `typ = access` e `role`). Só as rotas de saúde e o Swagger respondem sem token. O webhook do Mercado Pago, fora de `/api`, também não leva token: ele é autenticado pela assinatura `x-signature`. Token de cliente, expirado ou assinado por outra chave responde **401**; papel sem permissão na rota responde **403**.
 
@@ -172,7 +172,7 @@ A cobrança traz `id`, `workOrderId`, `checkoutId` (o id da order no Mercado Pag
 | --- | --- | --- | --- |
 | POST | `/webhooks/mercadopago?data.id=<id da order>` | Mercado Pago, a cada mudança de uma order | 200, 401, 409, 503 |
 
-Fora do prefixo `api`, sem token e fora do Swagger. O cabeçalho `x-signature` (`ts=<instante>,v1=<hash>`) é validado com a chave secreta do webhook sobre o `data.id` em minúsculas, o `x-request-id` e o `ts`; assinatura inválida, `ts` ausente e `data.id` ausente respondem **401** "Assinatura do webhook inválida". Válida, o Billing consulta a order e encerra a cobrança `PENDING` se a order estiver encerrada; responde **200** depois de processar, inclusive para uma notificação repetida, de cobrança encerrada ou de order desconhecida, que não mudam nada. **503** (Mercado Pago fora do ar na consulta) e **409** (outra escrita encerrou a cobrança ao mesmo tempo) fazem o Mercado Pago repetir a notificação. O corpo enviado pelo Mercado Pago não é lido: só a order consultada vale.
+Fora do prefixo `api`, sem token e fora do Swagger. O cabeçalho `x-signature` (`ts=<instante>,v1=<hash>`) é validado com a chave secreta do webhook sobre o `data.id` em minúsculas, o `x-request-id` e o `ts`; assinatura inválida, `ts` ausente e `data.id` ausente numa notificação assinada com ele respondem **401** "Assinatura do webhook inválida". Sem a chave secreta configurada (`MERCADOPAGO_WEBHOOK_SECRET` vazia), toda notificação responde **503** "Webhook do Mercado Pago não configurado", sem conferir a assinatura: uma chave vazia aceitaria qualquer assinatura calculada com ela. Válida, o Billing consulta a order e encerra a cobrança `PENDING` se a order estiver encerrada; responde **200** depois de processar, inclusive para uma notificação repetida, de cobrança encerrada ou de order desconhecida, que não mudam nada. **503** (Mercado Pago fora do ar na consulta) e **409** (outra escrita encerrou a cobrança ao mesmo tempo) fazem o Mercado Pago repetir a notificação. O corpo enviado pelo Mercado Pago não é lido: só a order consultada vale.
 
 ## Rotas internas (`/internal`)
 

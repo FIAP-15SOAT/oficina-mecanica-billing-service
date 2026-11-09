@@ -1,4 +1,5 @@
-const ISO_DURATION = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/;
+// The lookahead keeps a bare T (P1DT) out, which ISO 8601 does not allow.
+const ISO_DURATION = /^P(?:(\d+)D)?(?:T(?=\d)(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/;
 
 const UNIT_MILLISECONDS = [86_400_000, 3_600_000, 60_000, 1_000];
 

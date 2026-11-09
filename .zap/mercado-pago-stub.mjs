@@ -43,7 +43,7 @@ createServer(async (req, res) => {
       };
 
       orders.set(orderId, created);
-      
+
       reply(res, 201, created);
     } else if (!order) {
       reply(res, 404, { message: 'order not found' });

@@ -106,7 +106,7 @@ As rotas de cobrança chamam a Orders API do Mercado Pago (a API que cria, consu
 - **Na máquina** (`npm run start:dev`), a API lê as quatro variáveis `MERCADOPAGO_*` do `app/.env`. O `.env.example` traz a URL real (`https://api.mercadopago.com`), a expiração `P1D` e as credenciais vazias.
 - **No compose base** (`app/docker-compose.yml`), o container da API lê do `app/.env` a URL (padrão `https://api.mercadopago.com`), o access token e a chave do webhook, do mesmo jeito que chama os outros serviços pelo host, sem stub. A expiração fica fixa em `P1D`.
 
-Sem credencial, a API sobe saudável e as rotas de cobrança respondem 503, porque o Mercado Pago recusa a chamada sem token. Para criar cobranças de verdade no sandbox, preencha no `app/.env` as credenciais da aplicação da conta vendedora de teste ([Runbook › Contas de teste](runbook.md#contas-de-teste)). O webhook não chega a uma API local: o Mercado Pago só notifica a URL HTTPS cadastrada no painel, que é a do API Gateway.
+Sem credencial, a API sobe saudável e as rotas de cobrança respondem 503, porque o Mercado Pago recusa a chamada sem token; o webhook também responde 503 sem a chave secreta, porque uma chave vazia aceitaria qualquer assinatura calculada com ela. Para criar cobranças de verdade no sandbox, preencha no `app/.env` as credenciais da aplicação da conta vendedora de teste ([Runbook › Contas de teste](runbook.md#contas-de-teste)). O webhook não chega a uma API local: o Mercado Pago só notifica a URL HTTPS cadastrada no painel, que é a do API Gateway.
 
 O override do DAST (`app/docker-compose.dast.yml`) troca o Mercado Pago pelo serviço `mercadopago-stub`, que roda `.zap/mercado-pago-stub.mjs` e responde a criação, a consulta e o cancelamento de orders sem credencial real, com o token `stub-access-token`, a chave `stub-webhook-secret` e o link `https://localhost/checkout/<id>`. O mesmo override sobe o stub do Work Order e do Inventory, que responde a OS em `IN_DIAGNOSIS`: nesse stack a criação de cobrança responde 409, e criar uma cobrança exige uma OS em `APPROVED` ([Testes › Postman / Newman](testing.md#postman--newman)).
 
@@ -140,7 +140,7 @@ O `app/.env.example` tem todas as variáveis com comentários. As obrigatórias 
 | `INVENTORY_SERVICE_URL` | Sim | `http://localhost:3003` | Origem das rotas `/internal` do Inventory; no cluster, `http://inventory-service.inventory.svc.cluster.local:3000` |
 | `MERCADOPAGO_API_URL` | Sim | `https://api.mercadopago.com` | Origem da Orders API do Mercado Pago; o override do DAST aponta para o stub |
 | `MERCADOPAGO_ACCESS_TOKEN` | Sim, pode ficar vazia | vazio | Access token da aplicação no Mercado Pago, enviado como `Bearer`; vazio, as rotas de cobrança respondem 503. No cluster, vem do Secret `mercadopago` |
-| `MERCADOPAGO_WEBHOOK_SECRET` | Sim, pode ficar vazia | vazio | Chave secreta do webhook, do painel do Mercado Pago, que valida a `x-signature`. No cluster, vem do Secret `mercadopago` |
+| `MERCADOPAGO_WEBHOOK_SECRET` | Sim, pode ficar vazia | vazio | Chave secreta do webhook, do painel do Mercado Pago, que valida a `x-signature`; vazia, o webhook responde 503 sem conferir a assinatura. No cluster, vem do Secret `mercadopago` |
 | `MERCADOPAGO_ORDER_EXPIRATION` | Sim | `P1D` | Validade de cada order, em duração ISO 8601 (`P[nD][T[nH][nM][nS]]`, como `P1D` ou `PT30M`); outro formato impede a API de subir |
 | `ALLOWED_ORIGINS` | Não | `http://localhost:3002` | Origens do CORS, separadas por vírgula |
 | `LOG_LEVEL` | Não | `info` | Nível do log |

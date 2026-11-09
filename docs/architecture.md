@@ -172,7 +172,7 @@ O adaptador `HttpMercadoPagoOrderGateway` (`infrastructure/gateways/mercado-pago
 | `findCheckoutById` | `GET /v1/orders/:id` | A order é a fonte da verdade do status |
 | `cancelCheckout` | `POST /v1/orders/:id/cancel` | Uma `X-Idempotency-Key` nova a cada chamada, porque cancelar de novo uma order cancelada é inofensivo |
 
-O `capture_mode` `automatic_async` é fixo no adaptador: o valor `automatic` liga o modo binário do Mercado Pago, que recusa pagamentos pendentes, como Pix e boleto gerados e ainda não pagos. No cancelamento, as respostas 400, 409 e 422 são recusa (`ServiceRequestRejectedException`) e levam à consulta da order; qualquer outra falha (sem resposta em 5 s, 423, 429, 5xx, outro 4xx ou uma criação sem `id` ou `checkout_url`) é indisponibilidade (`ServiceIntegrationException`, 503), com uma mensagem que não leva o token nem o corpo do erro. O SDK `mercadopago` só entra no webhook.
+O `capture_mode` `automatic_async` é fixo no adaptador: o valor `automatic` liga o modo binário do Mercado Pago, que recusa pagamentos pendentes, como Pix e boleto gerados e ainda não pagos. No cancelamento, as respostas 400, 409 e 422 são recusa (`ServiceRequestRejectedException`) e levam à consulta da order; qualquer outra falha (sem resposta em 5 s, 423, 429, 5xx, outro 4xx, uma resposta sem o `status` da order, ou uma criação sem `id`, com `id` acima de 64 caracteres ou com `checkout_url` que não é `https`) é indisponibilidade (`ServiceIntegrationException`, 503), com uma mensagem que não leva o token nem o corpo do erro. O SDK `mercadopago` só entra no webhook.
 
 ### Criação da cobrança
 

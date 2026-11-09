@@ -130,25 +130,31 @@ describe('Payment (E2E)', () => {
     ).toHaveLength(0);
   });
 
-  it('should answer 422 for a zero amount and 400 for an amount with three decimals', async () => {
-    const zero = await request(httpServer)
+  it.each([0, -10])('should answer 422 for the amount %p', async (amount) => {
+    const response = await request(httpServer)
       .post('/api/payments')
       .set('Authorization', `Bearer ${staffToken}`)
-      .send({ workOrderId, amount: 0 })
+      .send({ workOrderId, amount })
       .expect(422);
 
-    const threeDecimals = await request(httpServer)
-      .post('/api/payments')
-      .set('Authorization', `Bearer ${staffToken}`)
-      .send({ workOrderId, amount: 10.005 })
-      .expect(400);
-
-    expect(zero.body.message).toBe('O valor da cobrança deve ser maior que zero');
-
-    expect(threeDecimals.body.message).toEqual([
-      'O valor da cobrança deve ser um número com no máximo 2 casas decimais',
-    ]);
+    expect(response.body.message).toBe('O valor da cobrança deve ser maior que zero');
   });
+
+  // 2e-7 is written without a decimal point, so it exercises the check on the text form.
+  it.each([10.005, 2e-7])(
+    'should answer 400 for the amount %p, beyond two decimals',
+    async (amount) => {
+      const response = await request(httpServer)
+        .post('/api/payments')
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ workOrderId, amount })
+        .expect(400);
+
+      expect(response.body.message).toEqual([
+        'O valor da cobrança deve ser um número com no máximo 2 casas decimais',
+      ]);
+    },
+  );
 
   it('should answer 503 and save nothing when Mercado Pago is unavailable', async () => {
     mercadoPago.unavailable = true;

@@ -125,6 +125,8 @@ curl -i -X POST http://localhost:3002/api/payments/<id da cobrança>/cancellatio
 
 **Pelo painel do Mercado Pago.** Também é possível cancelar a order na conta vendedora de teste, pelo `checkoutId` da cobrança. Com o webhook funcionando, a notificação leva a cobrança a `CANCELLED`; sem ele, o cancelamento pela API do Billing, depois, encontra a order `canceled` e encerra a cobrança com 200.
 
+**Order estornada.** Se o 409 de pagamento em andamento continuar depois da expiração da order, consulte a order como em [Consulta da order pelo checkoutId](#consulta-da-order-pelo-checkoutid). Uma order `refunded` (pagamento devolvido ao comprador) ou `charged_back` (pagamento contestado pelo comprador no cartão) com a cobrança ainda `PENDING` quer dizer que a notificação do pagamento não chegou e que o pagamento foi desfeito depois. O Billing só registra esse estado: nenhuma rota encerra a cobrança, e a OS não aceita outra cobrança enquanto ela estiver `PENDING`. Leve o caso ao grupo.
+
 Para achar a cobrança presa de uma OS:
 
 ```bash

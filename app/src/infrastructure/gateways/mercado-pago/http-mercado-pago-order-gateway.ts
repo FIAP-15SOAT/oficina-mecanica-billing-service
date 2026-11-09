@@ -6,6 +6,8 @@ import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 
+import { MAX_CHECKOUT_ID_LENGTH } from '@domain/constants/validation/payment.constants';
+
 import { ServiceRequestRejectedException } from '@application/exceptions/service-request-rejected.exception';
 import {
   CheckoutCreationRequest,
@@ -79,7 +81,13 @@ export class HttpMercadoPagoOrderGateway implements IPaymentProviderGateway {
       unavailableMessage: CREATE_UNAVAILABLE_MESSAGE,
     });
 
-    if (!order?.id || !order.checkout_url) {
+    // A checkout the payment cannot store is a provider failure, not a staff input error.
+    if (
+      !order.id ||
+      order.id.length > MAX_CHECKOUT_ID_LENGTH ||
+      !order.checkout_url ||
+      URL.parse(order.checkout_url)?.protocol !== 'https:'
+    ) {
       throw new ServiceIntegrationException(CREATE_UNAVAILABLE_MESSAGE);
     }
 
@@ -115,11 +123,22 @@ export class HttpMercadoPagoOrderGateway implements IPaymentProviderGateway {
   }
 
   private async requestOrdersApi(request: OrdersApiRequest): Promise<OrderBody> {
+    const order = await this.sendOrdersApiRequest(request);
+
+    // A 2xx without the order status says nothing about the checkout.
+    if (!order?.status) {
+      throw new ServiceIntegrationException(request.unavailableMessage);
+    }
+
+    return order;
+  }
+
+  private async sendOrdersApiRequest(request: OrdersApiRequest): Promise<OrderBody | null> {
     const { method, path, body, idempotencyKey } = request;
 
     try {
       const response = await firstValueFrom(
-        this.httpService.request<OrderBody>({
+        this.httpService.request<OrderBody | null>({
           method,
           url: `${this.apiUrl}${path}`,
           data: body,
