@@ -42,8 +42,8 @@ export class MercadoPagoSignatureGuard implements CanActivate {
       WebhookSignatureValidator.validate({
         xSignature: request.headers['x-signature'],
         xRequestId: request.headers['x-request-id'],
-        // Mercado Pago signs the lowercase id; the order is still read by the id as received.
-        dataId: checkoutId?.toLowerCase(),
+        // Order notifications are signed over the id as sent, not lowercased as the generic guide says.
+        dataId: checkoutId,
         secret: this.webhookSecret,
       });
     } catch (error) {

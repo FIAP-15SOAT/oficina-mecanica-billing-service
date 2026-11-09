@@ -14,7 +14,7 @@ export function signMercadoPagoWebhook({
   ts,
   secret,
 }: MercadoPagoWebhookSignatureInput): string {
-  const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`;
+  const manifest = `id:${dataId};request-id:${requestId};ts:${ts};`;
   const hash = createHmac('sha256', secret).update(manifest).digest('hex');
 
   return `ts=${ts},v1=${hash}`;

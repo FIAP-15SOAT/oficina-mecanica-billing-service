@@ -104,7 +104,7 @@ describe('MercadoPagoSignatureGuard', () => {
     expect(await receivedCounts()).toEqual({ valid: 1 });
   });
 
-  it('should validate the signature with the data id in lowercase', () => {
+  it('should validate the signature with the data id as received', () => {
     const signature = signMercadoPagoWebhook({
       dataId: 'ORD000001',
       requestId: REQUEST_ID,
