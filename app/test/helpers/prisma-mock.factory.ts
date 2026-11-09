@@ -35,6 +35,7 @@ export type MockPrismaService = {
   quote: MockDelegate;
   quoteService: MockDelegate;
   quotePartSupply: MockDelegate;
+  payment: MockDelegate;
   $connect: jest.Mock;
   $disconnect: jest.Mock;
   $transaction: jest.Mock;
@@ -48,6 +49,7 @@ export function createMockPrismaClient(): MockPrismaService {
     quote: createMockDelegate(),
     quoteService: createMockDelegate(),
     quotePartSupply: createMockDelegate(),
+    payment: createMockDelegate(),
     $connect: jest.fn(),
     $disconnect: jest.fn(),
     $transaction: jest
