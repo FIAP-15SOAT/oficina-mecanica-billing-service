@@ -82,6 +82,16 @@ export const TECHNICAL_EVENTS = {
     message: 'message failed on its last delivery and goes to the dead-letter queue',
     level: 'error',
   }),
+  PAYMENT_WEBHOOK_RECEIVED: defineLogEvent<{ checkoutId?: string }>({
+    name: 'payment.webhook.received',
+    message: 'mercado pago notification accepted',
+    level: 'info',
+  }),
+  PAYMENT_WEBHOOK_INVALID_SIGNATURE: defineLogEvent<{ signatureFailureReason: string }>({
+    name: 'payment.webhook.invalid_signature',
+    message: 'mercado pago notification rejected for an invalid signature',
+    level: 'warn',
+  }),
   CACHE_UNAVAILABLE: defineLogEvent<EmptyFields>({
     name: 'cache.unavailable',
     message: 'cache command failed, falling back to the database',

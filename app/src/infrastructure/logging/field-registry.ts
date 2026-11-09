@@ -101,6 +101,13 @@ export const LOGICAL_FIELDS: Readonly<Record<LogicalFieldName, LogicalFieldDefin
     owner: 'use-case',
     sensitivity: 'clear',
   },
+  signatureFailureReason: {
+    key: 'oficina.mp.signature.failure_reason',
+    type: 'string',
+    cardinality: 'fixed',
+    owner: 'infrastructure-service',
+    sensitivity: 'clear',
+  },
   port: {
     key: 'oficina.app.port',
     type: 'number',

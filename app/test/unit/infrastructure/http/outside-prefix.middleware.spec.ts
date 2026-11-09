@@ -24,6 +24,10 @@ describe('rejectOutsideGlobalPrefix', () => {
     expect(run('/internal/work-orders/1')).toHaveBeenCalledWith();
   });
 
+  it('should let webhook paths through', () => {
+    expect(run('/webhooks/mercadopago')).toHaveBeenCalledWith();
+  });
+
   it('should hand Nest a 404 for the bare internal prefix', () => {
     const [error] = run('/internal').mock.calls[0] as [unknown];
 

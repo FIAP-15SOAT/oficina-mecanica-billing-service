@@ -9,17 +9,21 @@ import { IMercadoPagoOrderGateway } from '@application/ports/output/gateways/mer
 import { IWorkOrderGateway } from '@application/ports/output/gateways/work-order/work-order-gateway.interface';
 import { ILogger } from '@application/ports/output/services/logger.service.interface';
 import { IMetrics } from '@application/ports/output/services/metrics.service.interface';
+import { PaymentCloser } from '@application/services/payment-closer';
 import { WorkOrderBalanceReader } from '@application/services/work-order-balance-reader';
 import { CreatePaymentUseCase } from '@application/use-cases/payment/create-payment.use-case';
 import { FindAllPaymentsPaginatedUseCase } from '@application/use-cases/payment/find-all-payments-paginated.use-case';
 import { FindPaymentByIdUseCase } from '@application/use-cases/payment/find-payment-by-id.use-case';
+import { SyncPaymentStatusUseCase } from '@application/use-cases/payment/sync-payment-status.use-case';
 
 import { PaymentController as PaymentCleanController } from '@interface-adapters/payment/payment.controller';
+import { PaymentWebhookController as PaymentWebhookCleanController } from '@interface-adapters/payment/payment-webhook.controller';
 
 import { PaymentController } from './payment.controller';
+import { PaymentWebhookController } from './payment-webhook.controller';
 
 @Module({
-  controllers: [PaymentController],
+  controllers: [PaymentController, PaymentWebhookController],
   providers: [
     {
       provide: PaymentCleanController,
@@ -56,6 +60,31 @@ import { PaymentController } from './payment.controller';
         'ILogger',
         'IMetrics',
         ConfigService,
+      ],
+    },
+    {
+      provide: PaymentWebhookCleanController,
+      useFactory: (
+        unitOfWork: IUnitOfWork,
+        paymentRepository: IPaymentRepository,
+        mercadoPagoOrderGateway: IMercadoPagoOrderGateway,
+        logger: ILogger,
+        metrics: IMetrics,
+      ) =>
+        new PaymentWebhookCleanController(
+          new SyncPaymentStatusUseCase(
+            paymentRepository,
+            mercadoPagoOrderGateway,
+            new PaymentCloser(unitOfWork, logger, metrics),
+            logger,
+          ),
+        ),
+      inject: [
+        'IUnitOfWork',
+        'IPaymentRepository',
+        'IMercadoPagoOrderGateway',
+        'ILogger',
+        'IMetrics',
       ],
     },
   ],

@@ -6,6 +6,7 @@ export type LogicalFieldName =
   | 'checkoutId'
   | 'paymentStatus'
   | 'checkoutStatus'
+  | 'signatureFailureReason'
   | 'port'
   | 'signal'
   | 'dependencyName'
