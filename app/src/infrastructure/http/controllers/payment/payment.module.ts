@@ -15,8 +15,11 @@ import { CancelPaymentUseCase } from '@application/use-cases/payment/cancel-paym
 import { CreatePaymentUseCase } from '@application/use-cases/payment/create-payment.use-case';
 import { FindAllPaymentsPaginatedUseCase } from '@application/use-cases/payment/find-all-payments-paginated.use-case';
 import { FindPaymentByIdUseCase } from '@application/use-cases/payment/find-payment-by-id.use-case';
+import { FindWorkOrderBalanceUseCase } from '@application/use-cases/payment/find-work-order-balance.use-case';
+import { FindWorkOrderPaymentsUseCase } from '@application/use-cases/payment/find-work-order-payments.use-case';
 import { SyncPaymentStatusUseCase } from '@application/use-cases/payment/sync-payment-status.use-case';
 
+import { InternalPaymentController as InternalPaymentCleanController } from '@interface-adapters/payment/internal-payment.controller';
 import { PaymentController as PaymentCleanController } from '@interface-adapters/payment/payment.controller';
 import { PaymentWebhookController as PaymentWebhookCleanController } from '@interface-adapters/payment/payment-webhook.controller';
 
@@ -94,6 +97,18 @@ import { PaymentWebhookController } from './payment-webhook.controller';
         'IMetrics',
       ],
     },
+    {
+      provide: InternalPaymentCleanController,
+      useFactory: (quoteRepository: IQuoteRepository, paymentRepository: IPaymentRepository) =>
+        new InternalPaymentCleanController(
+          new FindWorkOrderPaymentsUseCase(paymentRepository),
+          new FindWorkOrderBalanceUseCase(
+            new WorkOrderBalanceReader(quoteRepository, paymentRepository),
+          ),
+        ),
+      inject: ['IQuoteRepository', 'IPaymentRepository'],
+    },
   ],
+  exports: [InternalPaymentCleanController],
 })
 export class PaymentModule {}

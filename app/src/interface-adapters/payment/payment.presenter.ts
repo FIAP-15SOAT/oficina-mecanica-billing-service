@@ -1,6 +1,12 @@
 import { Payment } from '@domain/entities/payment.entity';
 import { PaginatedResult } from '@domain/interfaces/common/pagination.interface';
 
+import { WorkOrderBalance } from '@application/services/work-order-balance-reader';
+
+import {
+  InternalPaymentListResponse,
+  InternalWorkOrderBalanceDataResponse,
+} from './responses/internal-payment.response';
 import {
   PaymentDataResponse,
   PaymentPaginatedResponse,
@@ -30,6 +36,20 @@ export class PaymentPresenter {
     return {
       data: result.items.map((payment) => PaymentPresenter.toResponse(payment)),
       pagination: result.pagination,
+    };
+  }
+
+  static toListResponse(payments: readonly Payment[]): InternalPaymentListResponse {
+    return { data: payments.map((payment) => PaymentPresenter.toResponse(payment)) };
+  }
+
+  static toBalanceDataResponse(balance: WorkOrderBalance): InternalWorkOrderBalanceDataResponse {
+    return {
+      data: {
+        approvedTotal: balance.approvedTotal.toFixed(2),
+        paidTotal: balance.paidTotal.toFixed(2),
+        balance: balance.balance.toFixed(2),
+      },
     };
   }
 }

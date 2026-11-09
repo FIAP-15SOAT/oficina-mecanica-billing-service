@@ -34,4 +34,24 @@ describe('PaymentPresenter', () => {
       pagination,
     });
   });
+
+  it('should project each payment inside the list envelope', () => {
+    const payments = [createMockPayment(), createMockPayment()];
+
+    const response = PaymentPresenter.toListResponse(payments);
+
+    expect(response).toEqual({
+      data: payments.map((payment) => PaymentPresenter.toResponse(payment)),
+    });
+  });
+
+  it('should answer the balance as two-decimal strings', () => {
+    const balance = { approvedTotal: 500, paidTotal: 100, balance: 400, hasPendingPayment: true };
+
+    const response = PaymentPresenter.toBalanceDataResponse(balance);
+
+    expect(response).toEqual({
+      data: { approvedTotal: '500.00', paidTotal: '100.00', balance: '400.00' },
+    });
+  });
 });
