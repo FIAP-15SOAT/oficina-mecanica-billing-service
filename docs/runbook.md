@@ -18,14 +18,23 @@ Os comandos `kubectl` pressupõem o `kubeconfig` do cluster EKS, configurado com
 
 ## Contas de teste
 
-O teste com webhook usa duas contas de teste do Mercado Pago, criadas uma vez em **Suas integrações → Contas de teste**:
+O teste usa duas contas de teste do Mercado Pago, criadas uma vez em **Suas integrações → Contas de teste** de uma conta real do grupo:
 
 | Conta | Papel |
 | --- | --- |
-| Vendedora | Dona da aplicação que o Billing usa. As **credenciais de produção** da aplicação dela são as que o Billing recebe, porque um pagamento criado com credenciais de teste não dispara o webhook |
-| Compradora | Paga a cobrança na página do Checkout Pro |
+| Vendedora | Dona da aplicação que o Billing usa. O Mercado Pago a cria junto com a primeira aplicação do Checkout Pro da conta real |
+| Compradora | Paga a cobrança na página do Checkout Pro. Precisa ser outra conta de teste, do mesmo país da vendedora |
 
-Com a conta vendedora, crie em **Suas integrações** uma aplicação do Checkout Pro e, em **Webhooks**, ative o evento **Order (Mercado Pago)**. O access token fica nas credenciais de produção da aplicação, e a chave secreta, na tela de Webhooks.
+Entre no Mercado Pago com o usuário e a senha da conta vendedora (numa janela anônima; o código de verificação de 6 dígitos fica na tabela de Contas de teste) e use a aplicação dela em **Suas integrações**: o access token fica em **Credenciais**, e a chave secreta, em **Configuração de webhooks**, onde o evento **Order (Mercado Pago)** precisa estar marcado. Numa conta de teste, a aplicação tem um único par de credenciais, sem abas Teste e Produção. Na conta real, a aba **Teste** mostra o mesmo token da vendedora; a aba **Produção** é a da conta real e cobra dinheiro de verdade: nunca a use no Billing.
+
+Para conferir o dono do token antes de gravá-lo, sem que ele apareça na tela nem no histórico:
+
+```powershell
+# Pede o token sem exibi-lo e mostra o id, o apelido e o país do dono; o apelido de uma conta de teste começa com TESTUSER e o país do Brasil é MLB
+$t = Read-Host -AsSecureString "Token"; $p = [System.Net.NetworkCredential]::new('', $t).Password; (Invoke-RestMethod https://api.mercadopago.com/users/me -Headers @{ Authorization = "Bearer $p" }) | Select-Object id, nickname, site_id; Remove-Variable t, p
+```
+
+As orders criadas com uma credencial de conta de teste são de teste (o id começa com `ORDTST`), e **um pagamento de teste não dispara o webhook sozinho**. A notificação no sandbox sai pelo botão **Simular notificação** da tela de webhooks: com o evento **Order (Mercado Pago)** e o `checkoutId` da cobrança no **Data ID**, o Mercado Pago envia à URL cadastrada uma notificação assinada com a chave da aplicação, e o Billing consulta a order e encerra a cobrança pelo status real dela ([Pagamento com os cartões de teste](#pagamento-com-os-cartões-de-teste)).
 
 Para usar essas credenciais no stack local, grave-as no `app/.env` (`MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET`) e recrie o container da API ([Como executar localmente › Mercado Pago](local-setup.md#mercado-pago)). O webhook só chega ao cluster, pela URL cadastrada no painel.
 
@@ -57,6 +66,8 @@ kubectl rollout restart deployment/billing-service -n billing
 kubectl rollout status deployment/billing-service -n billing
 ```
 
+**Antes de trocar de aplicação no Mercado Pago, cancele as cobranças `PENDING`** ([Cobrança presa](#cobrança-presa)). Uma order só é visível para o token da aplicação que a criou: depois da troca, a consulta responde `404 order_not_found`, o cancelamento pela API do Billing responde 503 e a cobrança fica `PENDING`, bloqueando outra cobrança da mesma OS. Trocar só a chave secreta, na mesma aplicação, não tem esse efeito.
+
 ## URL do webhook no painel
 
 O Mercado Pago só notifica a URL cadastrada no painel da aplicação: o Checkout Pro via Orders não aceita uma URL por cobrança. A URL é a do API Gateway da solução, que muda quando o ambiente é recriado. Por isso, **a cada sessão em que se testa pagamento**, atualize a URL no painel.
@@ -67,25 +78,25 @@ aws apigatewayv2 get-apis --query "Items[?Name=='apigw-oficina-mecanica'].ApiEnd
 ```
 
 1. Monte a URL do webhook: `<ApiEndpoint>/webhooks/mercadopago`.
-2. No painel da conta vendedora de teste, abra **Suas integrações → aplicação → Webhooks**, cole a URL no modo de produção, mantenha o evento **Order (Mercado Pago)** marcado e salve.
-3. Faça um pagamento de teste ([Pagamento com os cartões de teste](#pagamento-com-os-cartões-de-teste)) e confira no log do Billing que a notificação chegou e passou na assinatura:
+2. Logado como a conta vendedora de teste, abra **Suas integrações → aplicação → Configuração de webhooks**, cole a URL em **URL de produção**, mantenha o evento **Order (Mercado Pago)** marcado e salve.
+3. Faça um pagamento de teste e simule a notificação dele ([Pagamento com os cartões de teste](#pagamento-com-os-cartões-de-teste)); depois confira no log do Billing que a notificação chegou e passou na assinatura:
 
 ```bash
 # Procurar no log do Billing as notificações recebidas e as recusadas pela assinatura
 kubectl logs deployment/billing-service -n billing --since=15m | grep -E 'payment\.webhook\.(received|invalid_signature)'
 ```
 
-Cada notificação aceita gera uma linha `payment.webhook.received` e conta `oficina.payment.webhook.received` com `outcome = valid`. Nenhuma linha depois do pagamento indica a URL errada no painel; linhas `payment.webhook.invalid_signature` indicam a chave errada ([Troca da chave secreta do webhook](#troca-da-chave-secreta-do-webhook)).
+Cada notificação aceita gera uma linha `payment.webhook.received` e conta `oficina.payment.webhook.received` com `outcome = valid`. Nenhuma linha depois da simulação indica a URL errada no painel; linhas `payment.webhook.invalid_signature` indicam a chave errada ([Troca da chave secreta do webhook](#troca-da-chave-secreta-do-webhook)).
 
 ## Troca da chave secreta do webhook
 
-A chave secreta é da aplicação, e não da URL: ela só muda quando alguém clica em **Redefinir** na tela de Webhooks. Se o Mercado Pago gerar outra chave ao trocar a URL, siga o mesmo procedimento a cada troca.
+A chave secreta é da aplicação, e não da URL: ela só muda quando alguém clica em **Redefinir** na tela de webhooks, e trocar a URL a cada sessão não a muda.
 
 Com a chave nova:
 
 1. Copie a chave da tela de Webhooks.
 2. Grave-a em `MERCADOPAGO_WEBHOOK_SECRET` e reinicie os pods, como em [Credenciais no GitHub](#credenciais-no-github).
-3. Faça um pagamento de teste e confira o log, como em [URL do webhook no painel](#url-do-webhook-no-painel).
+3. Simule uma notificação e confira o log, como em [URL do webhook no painel](#url-do-webhook-no-painel).
 
 Enquanto o Billing usa a chave antiga, toda notificação responde 401 e registra `payment.webhook.invalid_signature`: as cobranças não mudam até o Mercado Pago repetir a notificação com a chave nova configurada, ou até o funcionário cancelar a cobrança ([Cobrança presa](#cobrança-presa)).
 
@@ -97,6 +108,10 @@ Abra o `checkoutUrl` da cobrança logado com a **conta compradora de teste** e p
 | --- | --- | --- |
 | `APRO` | Pagamento aprovado; a order fica `processed` | O webhook leva a cobrança a `APPROVED` e publica `billing.payment.approved` |
 | `OTHE` | Pagamento recusado por erro geral | A cobrança só muda se a order terminar `failed`: então vai a `REJECTED` e publica `billing.payment.failed` (`REJECTED`). Enquanto a order seguir aberta, o comprador pode tentar de novo e a cobrança continua `PENDING` |
+
+O efeito no Billing só acontece com a notificação: depois de pagar, simule-a na tela de webhooks da aplicação (**Simular notificação**, evento **Order (Mercado Pago)**, **Data ID** igual ao `checkoutId`), porque um pagamento de teste não dispara o webhook sozinho ([Contas de teste](#contas-de-teste)).
+
+O checkout de teste também gera boleto (com um CEP válido no endereço). Um boleto gerado e não pago deixa a order `action_required`, e a cobrança continua `PENDING`; o cancelamento pela API do Billing é aceito pelo Mercado Pago nesse estado e encerra a cobrança `CANCELLED`. O checkout de teste não oferece Pix.
 
 Confira a cobrança pela API (`GET /api/payments/:id`) e a order pelo `checkoutId` ([Consulta da order pelo checkoutId](#consulta-da-order-pelo-checkoutid)).
 
@@ -119,7 +134,7 @@ curl -i -X POST http://localhost:3002/api/payments/<id da cobrança>/cancellatio
 | 200, `status` `CANCELLED` | A order estava aberta e foi cancelada | Nada: `billing.payment.failed` (`CANCELLED`) foi publicado e a OS aceita outra cobrança |
 | 200, `status` `EXPIRED`, `CANCELLED` ou `REJECTED` | A order já tinha encerrado sem pagamento e o webhook não chegou | Nada: a cobrança tem o status final e `billing.payment.failed` foi publicado. Confira a URL do webhook no painel |
 | 409 "A cobrança não pode ser cancelada porque já foi paga" | O cliente pagou e o webhook não chegou | A cobrança foi a `APPROVED` e `billing.payment.approved` foi publicado. Confira a URL do webhook no painel |
-| 409 "A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente..." | Há um pagamento iniciado e não concluído (Pix ou boleto gerado, cartão em análise) | Espere: a cobrança fecha quando o pagamento for confirmado ou expirar. Sem webhook, repita o cancelamento depois da expiração |
+| 409 "A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente..." | O Mercado Pago recusou o cancelamento porque há um pagamento em processamento (por exemplo, cartão em análise). Boleto gerado e não pago não causa esse 409: o cancelamento é aceito | Espere: a cobrança fecha quando o pagamento for confirmado ou expirar. Sem webhook, repita o cancelamento depois da expiração |
 | 409 "Cobrança só pode ser cancelada no status PENDING..." | A cobrança já estava encerrada | Nada |
 | 503 | O Mercado Pago não respondeu | Repita depois |
 
