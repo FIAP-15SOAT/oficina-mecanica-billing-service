@@ -95,6 +95,15 @@ describe('classifyFieldName', () => {
     },
   );
 
+  it('should classify x-signature and xSignature as secret', () => {
+    expect(classifyFieldName('x-signature', anywhere)).toBe('secret');
+    expect(classifyFieldName('xSignature', anywhere)).toBe('secret');
+  });
+
+  it('should keep signatureFailureReason clear', () => {
+    expect(classifyFieldName('signatureFailureReason', anywhere)).toBe('clear');
+  });
+
   it('should give secret precedence over personal data', () => {
     expect(classifyFieldName('emailPassword', anywhere)).toBe('secret');
     expect(classifyFieldName('tokenName', anywhere)).toBe('secret');

@@ -77,6 +77,7 @@ export const SECRET_SEQUENCES: readonly (readonly string[])[] = [
   ['credential'],
   ['api', 'key'],
   ['connection', 'string'],
+  ['x', 'signature'],
 ];
 
 /**

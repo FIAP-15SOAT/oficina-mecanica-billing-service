@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Module } from '@nestjs/common';
 import { Client } from 'pg';
 import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
 import {
@@ -14,6 +15,7 @@ import { OutboxMessage } from '@domain/messaging/message-catalog';
 import { DECLARED_FIELD_NAMES } from '@infrastructure/logging/field-registry';
 import { MessageHandlerRegistry } from '@infrastructure/messaging/message-handler.registry';
 import { OUTBOX_RELAY_LOCK_KEY } from '@infrastructure/messaging/outbox-relay.service';
+import { PaymentMessagingModule } from '@infrastructure/messaging/handlers/payment/payment-messaging.module';
 import { TestContext, setupTestApp, teardownTestApp } from '../helpers/test-app.helper';
 
 class CancelPaymentPayload {
@@ -24,6 +26,10 @@ class CancelPaymentPayload {
   @IsNotEmpty()
   reason!: string;
 }
+
+// Stands in for the service's payment handlers, so this suite owns the handler registry.
+@Module({})
+class NoPaymentHandlersModule {}
 
 async function waitFor(
   condition: () => boolean | Promise<boolean>,
@@ -51,7 +57,11 @@ describe('Messaging (E2E)', () => {
   const failFirstDelivery = new Set<string>();
 
   beforeAll(async () => {
-    ctx = await setupTestApp({ withMessaging: true, captureLogs: true });
+    ctx = await setupTestApp({
+      withMessaging: true,
+      captureLogs: true,
+      overrideModules: [[PaymentMessagingModule, NoPaymentHandlersModule]],
+    });
     unitOfWork = ctx.app.get<IUnitOfWork>('IUnitOfWork');
     sqs = ctx.app.get(SQSClient);
 

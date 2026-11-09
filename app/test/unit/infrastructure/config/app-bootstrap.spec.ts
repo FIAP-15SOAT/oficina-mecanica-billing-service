@@ -7,7 +7,11 @@ import {
   resolvePort,
 } from '@infrastructure/config/app-bootstrap';
 import { setupSwagger } from '@infrastructure/config/swagger.config';
-import { GLOBAL_PREFIX, INTERNAL_PREFIX } from '@infrastructure/http/http.constants';
+import {
+  GLOBAL_PREFIX,
+  INTERNAL_PREFIX,
+  WEBHOOKS_PREFIX,
+} from '@infrastructure/http/http.constants';
 import { rejectOutsideGlobalPrefix } from '@infrastructure/http/outside-prefix.middleware';
 import { TRUST_PROXY_REJECTED_WARNING } from '@infrastructure/logging/logger.config';
 
@@ -65,7 +69,17 @@ describe('configureApp', () => {
     configureApp(app);
 
     expect(app.setGlobalPrefix).toHaveBeenCalledWith(GLOBAL_PREFIX, {
-      exclude: [`${INTERNAL_PREFIX}/*path`],
+      exclude: expect.arrayContaining([`${INTERNAL_PREFIX}/*path`]),
+    });
+  });
+
+  it('should let webhook paths through', () => {
+    const { app } = createFakeApp();
+
+    configureApp(app);
+
+    expect(app.setGlobalPrefix).toHaveBeenCalledWith(GLOBAL_PREFIX, {
+      exclude: expect.arrayContaining([`${WEBHOOKS_PREFIX}/*path`]),
     });
   });
 

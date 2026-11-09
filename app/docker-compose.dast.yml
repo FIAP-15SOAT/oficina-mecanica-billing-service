@@ -1,4 +1,5 @@
-# DAST override: the Work Order and the Inventory answer from the contract fixtures.
+# DAST override: the Work Order and the Inventory answer from the contract fixtures, and a
+# stub answers for Mercado Pago, so the scan needs no real credential.
 services:
   internal-stubs:
     image: node:24-alpine
@@ -10,7 +11,17 @@ services:
       - ../.zap/internal-services-stub.mjs:/stub/internal-services-stub.mjs:ro
       - ./test/contracts:/stub/contracts:ro
 
+  mercadopago-stub:
+    image: node:24-alpine
+    init: true
+    command: ["node", "/stub/mercado-pago-stub.mjs"]
+    volumes:
+      - ../.zap/mercado-pago-stub.mjs:/stub/mercado-pago-stub.mjs:ro
+
   api:
     environment:
       WORK_ORDER_SERVICE_URL: http://internal-stubs:3000
       INVENTORY_SERVICE_URL: http://internal-stubs:3000
+      MERCADOPAGO_API_URL: http://mercadopago-stub:3000
+      MERCADOPAGO_ACCESS_TOKEN: stub-access-token
+      MERCADOPAGO_WEBHOOK_SECRET: stub-webhook-secret

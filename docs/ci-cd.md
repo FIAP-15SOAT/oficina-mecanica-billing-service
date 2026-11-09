@@ -53,11 +53,13 @@ Todos os jobs rodam no environment `production` e só na `main`, com `vars.ENABL
 | Job | O que faz |
 |---|---|
 | `Build and Push App Image` | Build da imagem com `SERVICE_VERSION` = SHA e push para o ECR com as tags do SHA e `latest`. Com `image_tag` no disparo manual, só confere que a imagem existe no ECR e não faz build |
-| `Prepare Deployment Configuration` | Confere que `K8S_NAMESPACE` e `K8S_DEPLOYMENT_NAME` batem com os manifests e que `STAFF_JWT_PUBLIC_KEY` é uma chave pública PEM e `STAFF_JWT_KEY_ID` não está vazio; materializa `database-credentials` (RDS e `AWSCURRENT`) e `cache-credentials` (ElastiCache e `<id>-auth-token`); aplica `jwt-public-keys` e o ConfigMap `billing-config`, com o ARN do tópico montado pela conta da AWS |
+| `Prepare Deployment Configuration` | Confere que `K8S_NAMESPACE` e `K8S_DEPLOYMENT_NAME` batem com os manifests, que `STAFF_JWT_PUBLIC_KEY` é uma chave pública PEM e `STAFF_JWT_KEY_ID` não está vazio, e que `MERCADOPAGO_ACCESS_TOKEN` e `MERCADOPAGO_WEBHOOK_SECRET` não estão vazios; materializa `database-credentials` (RDS e `AWSCURRENT`) e `cache-credentials` (ElastiCache e `<id>-auth-token`); aplica `jwt-public-keys`, o Secret `mercadopago` e o ConfigMap `billing-config`, com o ARN do tópico montado pela conta da AWS |
 | `DB Migrate` | Aplica o Job `k8s/00-db-migrate-job.yaml` com a imagem nova (`prisma migrate deploy`, sem seed), espera o fim e mostra o log. Pulado com `image_tag`: a imagem antiga não tem o que migrar |
 | `App Deploy` | Renderiza o Deployment com a imagem e o rótulo `version`, aplica Service (NodePort 30082), HPA e Deployment no namespace `billing`, espera o `rollout status` e faz o smoke `GET /health/billing` pelo API Gateway `apigw-oficina-mecanica`. Sem a API do gateway, o smoke é pulado com aviso no resumo do job. Se o rollout ou o smoke falham, roda `kubectl rollout undo` e termina vermelho |
 
 O disparo manual com `image_tag` reimplanta uma imagem já publicada no ECR, como rollback manual. A credencial do banco nunca passa pelo GitHub: veja o [ADR 0004](adr/0004-materializacao-da-credencial-do-banco-no-cd.md).
+
+As credenciais do Mercado Pago seguem outro caminho, porque não existem na AWS: são secrets do repositório no environment `production`. O step `Render and apply Mercado Pago credentials` as codifica em base64, mascara no log também a forma em base64 (o GitHub só mascara o valor original), preenche o documento `mercadopago` de `k8s/01-secrets.yaml` e o aplica por stdin, sem arquivo intermediário. O Deployment lê o Secret por `envFrom`; a URL da Orders API (`MERCADOPAGO_API_URL`) e a expiração das orders (`MERCADOPAGO_ORDER_EXPIRATION`, `P1D`) ficam no ConfigMap `billing-config`, que não leva credencial.
 
 ## 3) Workflow de SAST (`sast.yml`)
 
@@ -91,6 +93,17 @@ O DAST também não depende do Work Order nem do Inventory. O override `app/dock
 
 Para conferir o stub fora do compose: `CONTRACTS_DIR=app/test/contracts node .zap/internal-services-stub.mjs` na raiz do repositório e `curl http://localhost:3000/internal/services/<id>`.
 
+O mesmo override troca o Mercado Pago pelo serviço `mercadopago-stub` (`node:24-alpine`, rodando `.zap/mercado-pago-stub.mjs`, sem dependências) e aponta para ele `MERCADOPAGO_API_URL`, com o token `stub-access-token` e a chave de webhook `stub-webhook-secret`: o scan não usa credencial real. O stub guarda as orders em memória e responde:
+
+| Rota | Resposta |
+|---|---|
+| `POST /v1/orders` | `201` com a order `created`, o id `ORD000001`, `ORD000002`, ... e o `checkout_url` `https://localhost/checkout/<id>` |
+| `GET /v1/orders/:id` | `200` com a order |
+| `POST /v1/orders/:id/cancel` | `200` com a order `canceled` quando ela está `created`; senão `409` |
+| Order desconhecida ou outra rota | `404` |
+
+Como o stub do Work Order responde a OS em `IN_DIAGNOSIS`, a criação de cobrança responde 409 no scan, antes de chamar o Mercado Pago.
+
 ## Secrets e variables
 
 | Nome | Tipo | Onde é definido | Usado por |
@@ -99,6 +112,7 @@ Para conferir o stub fora do compose: `CONTRACTS_DIR=app/test/contracts node .za
 | `BOT_APP_ID` | Variable | Organização | CI (`Open Pull Request`) |
 | `BOT_PRIVATE_KEY` | Secret | Organização | CI (`Open Pull Request`) |
 | `STAFF_JWT_PUBLIC_KEY`, `STAFF_JWT_KEY_ID` | Secret | Organização | CD (`jwt-public-keys`) |
+| `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` | Secret | Repositório, environment `production` | CD (`mercadopago`); credenciais de produção da aplicação da conta vendedora de teste ([Runbook](runbook.md#contas-de-teste)) |
 | `SONAR_TOKEN` | Secret | Repositório | SAST |
 | `ENABLE_DEPLOY` | Variable | Repositório | CD (interruptor do deploy automático) |
 | `EKS_CLUSTER_NAME` | Variable | Repositório | CD |

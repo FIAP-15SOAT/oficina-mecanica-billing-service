@@ -5,6 +5,7 @@ import { PrismaService } from '@infrastructure/persistence/prisma/prisma.service
 
 import { IUnitOfWork, IRepositories } from '@domain/interfaces/repositories/unit-of-work.interface';
 import { PrismaOutboxRepository } from './prisma-outbox.repository';
+import { PrismaPaymentRepository } from './prisma-payment.repository';
 import { PrismaQuoteRepository } from './prisma-quote.repository';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class PrismaUnitOfWork implements IUnitOfWork {
       const repositories: IRepositories = {
         outbox: new PrismaOutboxRepository(tx as unknown as PrismaService),
         quote: new PrismaQuoteRepository(tx as unknown as PrismaService),
+        payment: new PrismaPaymentRepository(tx as unknown as PrismaService),
       };
 
       return work(repositories);

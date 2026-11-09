@@ -25,7 +25,6 @@ import { SubmitQuoteUseCase } from '@application/use-cases/quote/submit-quote.us
 import { ApproveQuoteUseCase } from '@application/use-cases/quote/approve-quote.use-case';
 import { RejectQuoteUseCase } from '@application/use-cases/quote/reject-quote.use-case';
 import { UpdateQuoteStatusUseCase } from '@application/use-cases/quote/update-quote-status.use-case';
-import { RevertQuoteApprovalUseCase } from '@application/use-cases/quote/revert-quote-approval.use-case';
 import { CreateInitialQuoteUseCase } from '@application/use-cases/quote/create-initial-quote.use-case';
 import { DeleteQuoteUseCase } from '@application/use-cases/quote/delete-quote.use-case';
 import { DecideQuoteUseCase } from '@application/use-cases/quote/decide-quote.use-case';
@@ -34,8 +33,6 @@ import { CheckPartSupplyQuoteUsageUseCase } from '@application/use-cases/quote/c
 
 import { QuoteController as QuoteCleanController } from '@interface-adapters/quote/quote.controller';
 import { InternalQuoteController as InternalQuoteCleanController } from '@interface-adapters/quote/internal-quote.controller';
-
-import { QuoteMessageHandlers } from '@infrastructure/messaging/handlers/quote-message-handlers';
 
 import { QuoteController } from './quote.controller';
 import { WorkOrderQuoteController } from './work-order-quote.controller';
@@ -144,13 +141,6 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
         'ILogger',
       ],
     },
-    {
-      provide: RevertQuoteApprovalUseCase,
-      useFactory: (unitOfWork: IUnitOfWork, logger: ILogger, cache: ICache) =>
-        new RevertQuoteApprovalUseCase(unitOfWork, logger, cache),
-      inject: ['IUnitOfWork', 'ILogger', 'ICache'],
-    },
-    QuoteMessageHandlers,
   ],
   exports: [InternalQuoteCleanController],
 })

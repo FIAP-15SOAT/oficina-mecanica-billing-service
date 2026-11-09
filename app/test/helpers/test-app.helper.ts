@@ -24,6 +24,8 @@ import {
   STAFF_JWT_TEST_PUBLIC_KEY,
 } from './staff-jwt.helper';
 
+export const MERCADOPAGO_TEST_WEBHOOK_SECRET = 'test-webhook-secret';
+
 export interface LogCapture {
   lines(): Record<string, unknown>[];
   bootstrapLines(): Record<string, unknown>[];
@@ -58,6 +60,10 @@ export interface SetupTestAppOptions {
   withMessaging?: boolean;
   /** Base URL of the work order and inventory stub; the default refuses every connection. */
   internalServicesUrl?: string;
+  /** Base URL of the Mercado Pago stub; the default refuses every connection. */
+  mercadoPagoUrl?: string;
+  /** Modules swapped before compile, as `[original, replacement]` pairs. */
+  overrideModules?: [Type, Type][];
 }
 
 interface LogCaptureSeam {
@@ -146,6 +152,10 @@ export async function setupTestApp(options: SetupTestAppOptions = {}): Promise<T
   process.env.STAFF_JWT_AUDIENCE = STAFF_JWT_TEST_AUDIENCE;
   process.env.WORK_ORDER_SERVICE_URL = options.internalServicesUrl ?? 'http://127.0.0.1:9';
   process.env.INVENTORY_SERVICE_URL = options.internalServicesUrl ?? 'http://127.0.0.1:9';
+  process.env.MERCADOPAGO_API_URL = options.mercadoPagoUrl ?? 'http://127.0.0.1:9';
+  process.env.MERCADOPAGO_ACCESS_TOKEN = 'test-access-token';
+  process.env.MERCADOPAGO_WEBHOOK_SECRET = MERCADOPAGO_TEST_WEBHOOK_SECRET;
+  process.env.MERCADOPAGO_ORDER_EXPIRATION = 'P1D';
 
   execSync('npx prisma migrate deploy', {
     env: { ...process.env },
@@ -162,6 +172,10 @@ export async function setupTestApp(options: SetupTestAppOptions = {}): Promise<T
   if (!localstackContainer) {
     builder.overrideProvider(OutboxRelayService).useValue({});
     builder.overrideProvider(SqsConsumerService).useValue({});
+  }
+
+  for (const [original, replacement] of options.overrideModules ?? []) {
+    builder.overrideModule(original).useModule(replacement);
   }
 
   const captureLogs = options.captureLogs === true || options.captureBootstrap === true;

@@ -2,7 +2,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 
-import { GLOBAL_PREFIX, INTERNAL_PREFIX } from '@infrastructure/http/http.constants';
+import {
+  GLOBAL_PREFIX,
+  INTERNAL_PREFIX,
+  WEBHOOKS_PREFIX,
+} from '@infrastructure/http/http.constants';
 import { rejectOutsideGlobalPrefix } from '@infrastructure/http/outside-prefix.middleware';
 import { DateSerializerInterceptor } from '@infrastructure/http/interceptors/date-serializer.interceptor';
 import { SanitizeStringsPipe } from '@infrastructure/http/pipes/sanitize-strings.pipe';
@@ -53,7 +57,9 @@ export function configureApp(
 ): string[] {
   const { trustedProxies, warnings } = resolveLoggerConfig();
 
-  app.setGlobalPrefix(GLOBAL_PREFIX, { exclude: [`${INTERNAL_PREFIX}/*path`] });
+  app.setGlobalPrefix(GLOBAL_PREFIX, {
+    exclude: [`${INTERNAL_PREFIX}/*path`, `${WEBHOOKS_PREFIX}/*path`],
+  });
   app.use(helmet());
   app.use(rejectOutsideGlobalPrefix);
 

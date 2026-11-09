@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { MessageEnvelope } from '@application/messaging/message-envelope';
 import { IRevertQuoteApprovalUseCase } from '@application/ports/input/quote/revert-quote-approval.use-case.interface';
-import { QuoteMessageHandlers } from '@infrastructure/messaging/handlers/quote-message-handlers';
-import { RevertQuoteApprovalPayloadDto } from '@infrastructure/messaging/handlers/revert-quote-approval-payload.dto';
+import { QuoteMessageHandlers } from '@infrastructure/messaging/handlers/quote/quote-message-handlers';
+import { RevertQuoteApprovalPayloadDto } from '@infrastructure/messaging/handlers/quote/dto/revert-quote-approval-payload.dto';
 import { MessageHandlerRegistry } from '@infrastructure/messaging/message-handler.registry';
 import { QuoteStatus } from '@domain/enums/quote-status.enum';
 

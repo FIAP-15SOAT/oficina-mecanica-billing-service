@@ -62,6 +62,11 @@ services:
       CACHE_TTL_SECONDS: 43200
       WORK_ORDER_SERVICE_URL: http://host.docker.internal:3000
       INVENTORY_SERVICE_URL: http://host.docker.internal:3003
+      # Without credentials in .env the payment routes answer 503; the boot does not fail.
+      MERCADOPAGO_API_URL: ${MERCADOPAGO_API_URL:-https://api.mercadopago.com}
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      MERCADOPAGO_ORDER_EXPIRATION: P1D
       TZ: America/Sao_Paulo
     # The other services run in their own compose stacks, published on the host.
     extra_hosts:

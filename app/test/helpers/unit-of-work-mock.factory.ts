@@ -1,6 +1,7 @@
 import { IUnitOfWork, IRepositories } from '@domain/interfaces/repositories/unit-of-work.interface';
 import { IQuoteRepository } from '@domain/interfaces/repositories/quote.repository.interface';
 import { createMockOutboxRepository } from './outbox-mock.factory';
+import { createMockPaymentRepository } from './payment-mock.factory';
 
 export function createMockQuoteRepository(): jest.Mocked<IQuoteRepository> {
   return {
@@ -26,6 +27,7 @@ export function createMockRepositories(): jest.Mocked<IRepositories> {
   return {
     outbox: createMockOutboxRepository(),
     quote: createMockQuoteRepository(),
+    payment: createMockPaymentRepository(),
   };
 }
 
