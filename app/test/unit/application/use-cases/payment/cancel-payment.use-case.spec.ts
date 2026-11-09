@@ -155,7 +155,7 @@ describe('CancelPaymentUseCase', () => {
       await expect(execution).rejects.toThrow(ResourceConflictException);
 
       await expect(execution).rejects.toThrow(
-        'A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente no Mercado Pago não for concluído. Ela será encerrada quando esse pagamento for confirmado ou expirar',
+        'A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente no provedor de pagamento não for concluído. Ela será encerrada quando esse pagamento for confirmado ou expirar',
       );
 
       expect(payment.status).toBe(PaymentStatus.PENDING);

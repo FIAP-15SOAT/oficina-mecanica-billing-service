@@ -63,7 +63,7 @@ export class CancelPaymentUseCase implements ICancelPaymentUseCase {
       });
 
       throw new ResourceConflictException(
-        'A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente no Mercado Pago não for concluído. Ela será encerrada quando esse pagamento for confirmado ou expirar',
+        'A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente no provedor de pagamento não for concluído. Ela será encerrada quando esse pagamento for confirmado ou expirar',
       );
     }
 

@@ -287,7 +287,7 @@ describe('Payment (E2E)', () => {
 
   describe('POST /api/payments/:id/cancellations', () => {
     const inProgressMessage =
-      'A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente no Mercado Pago não for concluído. Ela será encerrada quando esse pagamento for confirmado ou expirar';
+      'A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente no provedor de pagamento não for concluído. Ela será encerrada quando esse pagamento for confirmado ou expirar';
 
     it('should cancel a PENDING payment and store billing.payment.failed with CANCELLED', async () => {
       const created = await request(httpServer)
