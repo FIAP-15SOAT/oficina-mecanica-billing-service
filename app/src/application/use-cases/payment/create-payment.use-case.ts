@@ -8,7 +8,7 @@ import { BUSINESS_EVENTS } from '@application/logging/business-event.catalog';
 import { BUSINESS_METRICS } from '@application/metrics/business-metric.catalog';
 import { ICreatePaymentUseCase } from '@application/ports/input/payment/create-payment.use-case.interface';
 import { CreatePaymentDto } from '@application/ports/input/payment/dto/create-payment.dto';
-import { IMercadoPagoOrderGateway } from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.interface';
+import { IPaymentProviderGateway } from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.interface';
 import { IWorkOrderGateway } from '@application/ports/output/gateways/work-order/work-order-gateway.interface';
 import { WorkOrderStatus } from '@application/ports/output/gateways/work-order/work-order-gateway.response';
 import { ILogger } from '@application/ports/output/services/logger.service.interface';
@@ -24,7 +24,7 @@ export class CreatePaymentUseCase implements ICreatePaymentUseCase {
   constructor(
     private readonly unitOfWork: IUnitOfWork,
     private readonly workOrderGateway: IWorkOrderGateway,
-    private readonly mercadoPagoOrderGateway: IMercadoPagoOrderGateway,
+    private readonly paymentProviderGateway: IPaymentProviderGateway,
     private readonly workOrderBalanceReader: WorkOrderBalanceReader,
     private readonly logger: ILogger,
     private readonly metrics: IMetrics,
@@ -54,7 +54,7 @@ export class CreatePaymentUseCase implements ICreatePaymentUseCase {
 
     const paymentId = randomUUID();
 
-    const order = await this.mercadoPagoOrderGateway.createOrder({
+    const checkout = await this.paymentProviderGateway.createCheckout({
       paymentId,
       amount: input.amount.toFixed(2),
       title: `Ordem de serviço ${workOrder.number}`,
@@ -65,8 +65,8 @@ export class CreatePaymentUseCase implements ICreatePaymentUseCase {
       id: paymentId,
       workOrderId: input.workOrderId,
       amount: input.amount,
-      checkoutId: order.id,
-      checkoutUrl: order.checkoutUrl,
+      checkoutId: checkout.id,
+      checkoutUrl: checkout.checkoutUrl,
       expiresAt: new Date(Date.now() + this.orderExpirationMs),
     });
 

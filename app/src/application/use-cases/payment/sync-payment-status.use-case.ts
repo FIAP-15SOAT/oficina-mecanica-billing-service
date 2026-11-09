@@ -2,25 +2,22 @@ import { PaymentStatus } from '@domain/enums/payment-status.enum';
 import { IPaymentRepository } from '@domain/interfaces/repositories/payment.repository.interface';
 
 import { BUSINESS_EVENTS } from '@application/logging/business-event.catalog';
-import { MercadoPagoOrderStatusMapper } from '@application/mappers/mercado-pago-order-status.mapper';
+import { CheckoutStatusMapper } from '@application/mappers/checkout-status.mapper';
 import { ISyncPaymentStatusUseCase } from '@application/ports/input/payment/sync-payment-status.use-case.interface';
-import { IMercadoPagoOrderGateway } from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.interface';
-import { MercadoPagoOrderStatus } from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.response';
+import { IPaymentProviderGateway } from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.interface';
+import { CheckoutStatus } from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.response';
 import { ILogger } from '@application/ports/output/services/logger.service.interface';
 import { PaymentCloser } from '@application/services/payment-closer';
 
 // Only an approved payment can be refunded or charged back, so its checkout is still read.
 const SYNCED_PAYMENT_STATUSES = [PaymentStatus.PENDING, PaymentStatus.APPROVED];
 
-const REVERSED_ORDER_STATUSES = [
-  MercadoPagoOrderStatus.REFUNDED,
-  MercadoPagoOrderStatus.CHARGED_BACK,
-];
+const REVERSED_CHECKOUT_STATUSES = [CheckoutStatus.REFUNDED, CheckoutStatus.CHARGED_BACK];
 
 export class SyncPaymentStatusUseCase implements ISyncPaymentStatusUseCase {
   constructor(
     private readonly paymentRepository: IPaymentRepository,
-    private readonly mercadoPagoOrderGateway: IMercadoPagoOrderGateway,
+    private readonly paymentProviderGateway: IPaymentProviderGateway,
     private readonly paymentCloser: PaymentCloser,
     private readonly logger: ILogger,
   ) {}
@@ -44,18 +41,18 @@ export class SyncPaymentStatusUseCase implements ISyncPaymentStatusUseCase {
       return;
     }
 
-    const order = await this.mercadoPagoOrderGateway.findOrderById(checkoutId);
+    const checkout = await this.paymentProviderGateway.findCheckoutById(checkoutId);
 
-    if (REVERSED_ORDER_STATUSES.includes(order.status)) {
+    if (REVERSED_CHECKOUT_STATUSES.includes(checkout.status)) {
       this.logger.event(BUSINESS_EVENTS.PAYMENT_CHECKOUT_REVERSED, {
         ...fields,
-        checkoutStatus: order.status,
+        checkoutStatus: checkout.status,
       });
 
       return;
     }
 
-    const finalStatus = MercadoPagoOrderStatusMapper.toFinalPaymentStatus(order.status);
+    const finalStatus = CheckoutStatusMapper.toFinalPaymentStatus(checkout.status);
 
     if (payment.status === PaymentStatus.PENDING && finalStatus) {
       await this.paymentCloser.close(payment, finalStatus);
@@ -65,7 +62,7 @@ export class SyncPaymentStatusUseCase implements ISyncPaymentStatusUseCase {
     this.logger.event(BUSINESS_EVENTS.PAYMENT_SYNC_SKIPPED, {
       ...fields,
       paymentStatus: payment.status,
-      checkoutStatus: order.status,
+      checkoutStatus: checkout.status,
     });
   }
 }

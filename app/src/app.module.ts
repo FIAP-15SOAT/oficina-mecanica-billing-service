@@ -21,6 +21,8 @@ import { ClientsModule } from './infrastructure/clients/clients.module';
 import { GatewaysModule } from './infrastructure/gateways/gateways.module';
 import { QuoteModule } from './infrastructure/http/controllers/quote/quote.module';
 import { PaymentModule } from './infrastructure/http/controllers/payment/payment.module';
+import { QuoteMessagingModule } from './infrastructure/messaging/handlers/quote/quote-messaging.module';
+import { PaymentMessagingModule } from './infrastructure/messaging/handlers/payment/payment-messaging.module';
 import { InternalModule } from './infrastructure/http/controllers/internal/internal.module';
 
 @Module({
@@ -39,6 +41,8 @@ import { InternalModule } from './infrastructure/http/controllers/internal/inter
     HealthModule,
     QuoteModule,
     PaymentModule,
+    QuoteMessagingModule,
+    PaymentMessagingModule,
     InternalModule,
   ],
   providers: [

@@ -20,7 +20,7 @@ export class PaymentResponseDto implements PaymentResponse {
   workOrderId!: string;
 
   @ApiProperty({
-    description: 'ID do checkout (order) no Mercado Pago',
+    description: 'ID do checkout no provedor de pagamento',
     example: 'ORD01JQ4S4KY8HWQ6NA5PXB65B3D3',
   })
   checkoutId!: string;
@@ -36,7 +36,7 @@ export class PaymentResponseDto implements PaymentResponse {
   status!: PaymentStatus;
 
   @ApiProperty({
-    description: 'Link de pagamento do Mercado Pago enviado ao cliente',
+    description: 'Link de pagamento enviado ao cliente',
     example: 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=1',
   })
   checkoutUrl!: string;

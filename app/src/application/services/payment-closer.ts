@@ -22,18 +22,18 @@ export class PaymentCloser {
     const closed = await this.unitOfWork.executeTransaction(async (repos) => {
       const saved = await repos.payment.update(payment);
 
-      await repos.outbox.add(this.outcomeMessageFor(saved, status));
+      await repos.outbox.add(this.buildOutcomeMessage(saved, status));
 
       return saved;
     });
 
     this.metrics.increment(BUSINESS_METRICS.PAYMENT_RESOLVED, { paymentStatus: status });
-    this.logOutcome(closed, status);
+    this.logOutcomeEvent(closed, status);
 
     return closed;
   }
 
-  private outcomeMessageFor(payment: Payment, status: FinalPaymentStatus): OutboxMessage {
+  private buildOutcomeMessage(payment: Payment, status: FinalPaymentStatus): OutboxMessage {
     if (status === PaymentStatus.APPROVED) {
       return {
         type: 'billing.payment.approved',
@@ -53,7 +53,7 @@ export class PaymentCloser {
     };
   }
 
-  private logOutcome(payment: Payment, status: FinalPaymentStatus): void {
+  private logOutcomeEvent(payment: Payment, status: FinalPaymentStatus): void {
     const fields = {
       paymentId: payment.id,
       workOrderId: payment.workOrderId,

@@ -5,12 +5,13 @@ import { IPaymentRepository } from '@domain/interfaces/repositories/payment.repo
 import { IQuoteRepository } from '@domain/interfaces/repositories/quote.repository.interface';
 import { IUnitOfWork } from '@domain/interfaces/repositories/unit-of-work.interface';
 
-import { IMercadoPagoOrderGateway } from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.interface';
+import { IPaymentProviderGateway } from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.interface';
 import { IWorkOrderGateway } from '@application/ports/output/gateways/work-order/work-order-gateway.interface';
 import { ILogger } from '@application/ports/output/services/logger.service.interface';
 import { IMetrics } from '@application/ports/output/services/metrics.service.interface';
 import { PaymentCloser } from '@application/services/payment-closer';
 import { WorkOrderBalanceReader } from '@application/services/work-order-balance-reader';
+import { CancelPaymentUseCase } from '@application/use-cases/payment/cancel-payment.use-case';
 import { CreatePaymentUseCase } from '@application/use-cases/payment/create-payment.use-case';
 import { FindAllPaymentsPaginatedUseCase } from '@application/use-cases/payment/find-all-payments-paginated.use-case';
 import { FindPaymentByIdUseCase } from '@application/use-cases/payment/find-payment-by-id.use-case';
@@ -32,7 +33,7 @@ import { PaymentWebhookController } from './payment-webhook.controller';
         quoteRepository: IQuoteRepository,
         paymentRepository: IPaymentRepository,
         workOrderGateway: IWorkOrderGateway,
-        mercadoPagoOrderGateway: IMercadoPagoOrderGateway,
+        paymentProviderGateway: IPaymentProviderGateway,
         logger: ILogger,
         metrics: IMetrics,
         configService: ConfigService,
@@ -42,7 +43,7 @@ import { PaymentWebhookController } from './payment-webhook.controller';
           new CreatePaymentUseCase(
             unitOfWork,
             workOrderGateway,
-            mercadoPagoOrderGateway,
+            paymentProviderGateway,
             new WorkOrderBalanceReader(quoteRepository, paymentRepository),
             logger,
             metrics,
@@ -50,13 +51,19 @@ import { PaymentWebhookController } from './payment-webhook.controller';
           ),
           new FindPaymentByIdUseCase(paymentRepository),
           new FindAllPaymentsPaginatedUseCase(paymentRepository),
+          new CancelPaymentUseCase(
+            paymentRepository,
+            paymentProviderGateway,
+            new PaymentCloser(unitOfWork, logger, metrics),
+            logger,
+          ),
         ),
       inject: [
         'IUnitOfWork',
         'IQuoteRepository',
         'IPaymentRepository',
         'IWorkOrderGateway',
-        'IMercadoPagoOrderGateway',
+        'IPaymentProviderGateway',
         'ILogger',
         'IMetrics',
         ConfigService,
@@ -67,14 +74,14 @@ import { PaymentWebhookController } from './payment-webhook.controller';
       useFactory: (
         unitOfWork: IUnitOfWork,
         paymentRepository: IPaymentRepository,
-        mercadoPagoOrderGateway: IMercadoPagoOrderGateway,
+        paymentProviderGateway: IPaymentProviderGateway,
         logger: ILogger,
         metrics: IMetrics,
       ) =>
         new PaymentWebhookCleanController(
           new SyncPaymentStatusUseCase(
             paymentRepository,
-            mercadoPagoOrderGateway,
+            paymentProviderGateway,
             new PaymentCloser(unitOfWork, logger, metrics),
             logger,
           ),
@@ -82,7 +89,7 @@ import { PaymentWebhookController } from './payment-webhook.controller';
       inject: [
         'IUnitOfWork',
         'IPaymentRepository',
-        'IMercadoPagoOrderGateway',
+        'IPaymentProviderGateway',
         'ILogger',
         'IMetrics',
       ],

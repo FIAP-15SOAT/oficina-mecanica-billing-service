@@ -41,16 +41,16 @@ export class MercadoPagoSignatureGuard implements CanActivate {
         secret: this.webhookSecret,
       });
     } catch (error) {
-      throw this.rejectionFor(error);
+      throw this.handleValidationFailure(error);
     }
 
     this.logger.event(TECHNICAL_EVENTS.PAYMENT_WEBHOOK_RECEIVED, { checkoutId });
-    this.countWebhook('valid');
+    this.recordWebhookOutcome('valid');
 
     return true;
   }
 
-  private rejectionFor(error: unknown): unknown {
+  private handleValidationFailure(error: unknown): unknown {
     if (!(error instanceof InvalidWebhookSignatureError)) {
       return error;
     }
@@ -59,12 +59,12 @@ export class MercadoPagoSignatureGuard implements CanActivate {
       signatureFailureReason: error.reason,
     });
 
-    this.countWebhook('invalid_signature');
+    this.recordWebhookOutcome('invalid_signature');
 
     return new AuthenticationFailedException('Assinatura do webhook inválida');
   }
 
-  private countWebhook(outcome: WebhookOutcome): void {
+  private recordWebhookOutcome(outcome: WebhookOutcome): void {
     this.receivedWebhooksCounterMetric.add(1, { outcome });
   }
 }

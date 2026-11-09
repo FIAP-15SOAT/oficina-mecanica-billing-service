@@ -7,12 +7,12 @@ export const BUSINESS_METRICS = {
     name: 'payment.requested',
     kind: 'counter',
     unit: '{payment}',
-    description: 'Cobranças criadas no Mercado Pago e confirmadas em transação',
+    description: 'Cobranças criadas no provedor de pagamento e confirmadas em transação',
   }),
   PAYMENT_RESOLVED: defineBusinessMetric<{ paymentStatus: FinalPaymentStatus }>({
     name: 'payment.resolved',
     kind: 'counter',
     unit: '{payment}',
-    description: 'Cobranças encerradas pela order do Mercado Pago, por status final',
+    description: 'Cobranças encerradas pelo checkout do provedor de pagamento, por status final',
   }),
 } as const;

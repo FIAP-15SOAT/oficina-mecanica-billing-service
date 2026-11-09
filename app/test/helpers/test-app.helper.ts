@@ -62,6 +62,8 @@ export interface SetupTestAppOptions {
   internalServicesUrl?: string;
   /** Base URL of the Mercado Pago stub; the default refuses every connection. */
   mercadoPagoUrl?: string;
+  /** Modules swapped before compile, as `[original, replacement]` pairs. */
+  overrideModules?: [Type, Type][];
 }
 
 interface LogCaptureSeam {
@@ -170,6 +172,10 @@ export async function setupTestApp(options: SetupTestAppOptions = {}): Promise<T
   if (!localstackContainer) {
     builder.overrideProvider(OutboxRelayService).useValue({});
     builder.overrideProvider(SqsConsumerService).useValue({});
+  }
+
+  for (const [original, replacement] of options.overrideModules ?? []) {
+    builder.overrideModule(original).useModule(replacement);
   }
 
   const captureLogs = options.captureLogs === true || options.captureBootstrap === true;

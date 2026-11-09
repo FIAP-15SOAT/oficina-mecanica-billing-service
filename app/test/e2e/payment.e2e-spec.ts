@@ -285,6 +285,133 @@ describe('Payment (E2E)', () => {
     });
   });
 
+  describe('POST /api/payments/:id/cancellations', () => {
+    const inProgressMessage =
+      'A cobrança não pode ser cancelada enquanto o pagamento iniciado pelo cliente no Mercado Pago não for concluído. Ela será encerrada quando esse pagamento for confirmado ou expirar';
+
+    it('should cancel a PENDING payment and store billing.payment.failed with CANCELLED', async () => {
+      const created = await request(httpServer)
+        .post('/api/payments')
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ workOrderId, amount: 100 })
+        .expect(201);
+
+      const { id, checkoutId } = created.body.data;
+
+      const res = await request(httpServer)
+        .post(`/api/payments/${id}/cancellations`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .expect(200);
+
+      expect(res.body.data).toMatchObject({ id, status: 'CANCELLED' });
+      expect(mercadoPago.orders.get(checkoutId)?.status).toBe('canceled');
+
+      await expect(
+        ctx.prisma.outboxMessage.findMany({ where: { type: 'billing.payment.failed' } }),
+      ).resolves.toMatchObject([{ workOrderId, payload: { paymentId: id, reason: 'CANCELLED' } }]);
+    });
+
+    it('should answer 200 with an EXPIRED payment when the order expired before the cancellation', async () => {
+      const created = await request(httpServer)
+        .post('/api/payments')
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ workOrderId, amount: 100 })
+        .expect(201);
+
+      const { id, checkoutId } = created.body.data;
+      mercadoPago.orders.get(checkoutId)!.status = 'expired';
+
+      const res = await request(httpServer)
+        .post(`/api/payments/${id}/cancellations`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .expect(200);
+
+      expect(res.body.data).toMatchObject({ id, status: 'EXPIRED' });
+
+      await expect(
+        ctx.prisma.outboxMessage.findMany({ where: { type: 'billing.payment.failed' } }),
+      ).resolves.toMatchObject([{ payload: { paymentId: id, reason: 'EXPIRED' } }]);
+    });
+
+    it('should answer 409 with the paid message and store billing.payment.approved when the order was paid', async () => {
+      const created = await request(httpServer)
+        .post('/api/payments')
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ workOrderId, amount: 100 })
+        .expect(201);
+
+      const { id, checkoutId } = created.body.data;
+      mercadoPago.orders.get(checkoutId)!.status = 'processed';
+
+      const res = await request(httpServer)
+        .post(`/api/payments/${id}/cancellations`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .expect(409);
+
+      expect(res.body.message).toBe('A cobrança não pode ser cancelada porque já foi paga');
+
+      await expect(ctx.prisma.payment.findUnique({ where: { id } })).resolves.toMatchObject({
+        status: PaymentStatus.APPROVED,
+      });
+
+      await expect(
+        ctx.prisma.outboxMessage.findMany({ where: { type: 'billing.payment.approved' } }),
+      ).resolves.toMatchObject([{ payload: { paymentId: id, amount: '100.00' } }]);
+    });
+
+    it('should answer 409 with the in-progress message and keep the payment PENDING', async () => {
+      const created = await request(httpServer)
+        .post('/api/payments')
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ workOrderId, amount: 100 })
+        .expect(201);
+
+      const { id, checkoutId } = created.body.data;
+      mercadoPago.orders.get(checkoutId)!.status = 'action_required';
+
+      const res = await request(httpServer)
+        .post(`/api/payments/${id}/cancellations`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .expect(409);
+
+      expect(res.body.message).toBe(inProgressMessage);
+
+      await expect(ctx.prisma.payment.findUnique({ where: { id } })).resolves.toMatchObject({
+        status: PaymentStatus.PENDING,
+      });
+
+      await expect(
+        ctx.prisma.outboxMessage.count({
+          where: { type: { in: ['billing.payment.approved', 'billing.payment.failed'] } },
+        }),
+      ).resolves.toBe(0);
+    });
+
+    it('should answer 409 for a payment outside PENDING', async () => {
+      const created = await request(httpServer)
+        .post('/api/payments')
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ workOrderId, amount: 100 })
+        .expect(201);
+
+      const { id } = created.body.data;
+
+      await request(httpServer)
+        .post(`/api/payments/${id}/cancellations`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .expect(200);
+
+      const res = await request(httpServer)
+        .post(`/api/payments/${id}/cancellations`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .expect(409);
+
+      expect(res.body.message).toBe(
+        'Cobrança só pode ser cancelada no status PENDING. Status atual: "CANCELLED"',
+      );
+    });
+  });
+
   it('should answer 401 without a token', async () => {
     await request(httpServer).post('/api/payments').send({ workOrderId, amount: 100 }).expect(401);
   });

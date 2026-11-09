@@ -1,3 +1,4 @@
+import { ICancelPaymentUseCase } from '@application/ports/input/payment/cancel-payment.use-case.interface';
 import { ICreatePaymentUseCase } from '@application/ports/input/payment/create-payment.use-case.interface';
 import { IFindAllPaymentsPaginatedUseCase } from '@application/ports/input/payment/find-all-payments-paginated.use-case.interface';
 import { IFindPaymentByIdUseCase } from '@application/ports/input/payment/find-payment-by-id.use-case.interface';
@@ -12,6 +13,7 @@ export class PaymentController {
     private readonly createPaymentUseCase: ICreatePaymentUseCase,
     private readonly findPaymentByIdUseCase: IFindPaymentByIdUseCase,
     private readonly findAllPaymentsPaginatedUseCase: IFindAllPaymentsPaginatedUseCase,
+    private readonly cancelPaymentUseCase: ICancelPaymentUseCase,
   ) {}
 
   async create(input: CreatePaymentRequest): Promise<PaymentDataResponse> {
@@ -30,5 +32,9 @@ export class PaymentController {
     });
 
     return PaymentPresenter.toPaginatedResponse(result);
+  }
+
+  async cancel(id: string): Promise<PaymentDataResponse> {
+    return PaymentPresenter.toDataResponse(await this.cancelPaymentUseCase.execute(id));
   }
 }

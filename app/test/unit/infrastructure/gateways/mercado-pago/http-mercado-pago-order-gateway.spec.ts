@@ -4,7 +4,7 @@ import { AxiosError, AxiosHeaders, AxiosResponse } from 'axios';
 import { of, throwError } from 'rxjs';
 
 import { ServiceRequestRejectedException } from '@application/exceptions/service-request-rejected.exception';
-import { MercadoPagoOrderStatus } from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.response';
+import { CheckoutStatus } from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.response';
 import { ServiceIntegrationException } from '@infrastructure/exceptions/service-integration.exception';
 import { HttpMercadoPagoOrderGateway } from '@infrastructure/gateways/mercado-pago/http-mercado-pago-order-gateway';
 
@@ -57,7 +57,7 @@ describe('HttpMercadoPagoOrderGateway', () => {
     );
   });
 
-  describe('createOrder', () => {
+  describe('createCheckout', () => {
     it('should create the order with the checkout pro body and the payment id as idempotency key and external reference', async () => {
       httpService.request.mockReturnValue(
         of({
@@ -65,7 +65,7 @@ describe('HttpMercadoPagoOrderGateway', () => {
         } as AxiosResponse),
       );
 
-      await gateway.createOrder(CREATION_REQUEST);
+      await gateway.createCheckout(CREATION_REQUEST);
 
       expect(httpService.request).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -94,7 +94,7 @@ describe('HttpMercadoPagoOrderGateway', () => {
         } as AxiosResponse),
       );
 
-      await gateway.createOrder(CREATION_REQUEST);
+      await gateway.createCheckout(CREATION_REQUEST);
 
       expect(httpService.request).toHaveBeenCalledTimes(1);
       expect(httpService.request).toHaveBeenCalledWith(
@@ -119,11 +119,11 @@ describe('HttpMercadoPagoOrderGateway', () => {
         } as AxiosResponse),
       );
 
-      const order = await gateway.createOrder(CREATION_REQUEST);
+      const order = await gateway.createCheckout(CREATION_REQUEST);
 
       expect(order).toEqual({
         id: ORDER_ID,
-        status: MercadoPagoOrderStatus.CREATED,
+        status: CheckoutStatus.OPEN,
         checkoutUrl: CHECKOUT_URL,
       });
     });
@@ -135,13 +135,13 @@ describe('HttpMercadoPagoOrderGateway', () => {
     ])('should treat a created order %s as unavailable', async (_case, body) => {
       httpService.request.mockReturnValue(of({ data: body } as AxiosResponse));
 
-      const error = await gateway.createOrder(CREATION_REQUEST).catch((e: unknown) => e);
+      const error = await gateway.createCheckout(CREATION_REQUEST).catch((e: unknown) => e);
 
       expect(error).toEqual(new ServiceIntegrationException(CREATE_MESSAGE));
     });
   });
 
-  describe('findOrderById', () => {
+  describe('findCheckoutById', () => {
     it('should find an order by id', async () => {
       httpService.request.mockReturnValue(
         of({
@@ -149,9 +149,9 @@ describe('HttpMercadoPagoOrderGateway', () => {
         } as AxiosResponse),
       );
 
-      const order = await gateway.findOrderById(ORDER_ID);
+      const order = await gateway.findCheckoutById(ORDER_ID);
 
-      expect(order).toEqual({ id: ORDER_ID, status: MercadoPagoOrderStatus.PROCESSED });
+      expect(order).toEqual({ id: ORDER_ID, status: CheckoutStatus.PAID });
 
       expect(httpService.request).toHaveBeenCalledWith({
         method: 'GET',
@@ -161,22 +161,43 @@ describe('HttpMercadoPagoOrderGateway', () => {
         headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
       });
     });
+    it.each([
+      ['created', CheckoutStatus.OPEN],
+      ['action_required', CheckoutStatus.IN_PROGRESS],
+      ['processing', CheckoutStatus.IN_PROGRESS],
+      ['processed', CheckoutStatus.PAID],
+      ['expired', CheckoutStatus.EXPIRED],
+      ['canceled', CheckoutStatus.CANCELLED],
+      ['failed', CheckoutStatus.FAILED],
+      ['refunded', CheckoutStatus.REFUNDED],
+      ['charged_back', CheckoutStatus.CHARGED_BACK],
+      ['a_status_added_later', CheckoutStatus.IN_PROGRESS],
+    ])(
+      'should translate the order status %s to the checkout status %s',
+      async (orderStatus, status) => {
+        httpService.request.mockReturnValue(
+          of({ data: { id: ORDER_ID, status: orderStatus } } as AxiosResponse),
+        );
+
+        await expect(gateway.findCheckoutById(ORDER_ID)).resolves.toEqual({ id: ORDER_ID, status });
+      },
+    );
   });
 
-  describe('cancelOrder', () => {
+  describe('cancelCheckout', () => {
     it('should cancel an order with a fresh idempotency key per call', async () => {
       httpService.request.mockReturnValue(
         of({ data: { id: ORDER_ID, status: 'canceled' } } as AxiosResponse),
       );
 
-      const order = await gateway.cancelOrder(ORDER_ID);
-      await gateway.cancelOrder(ORDER_ID);
+      const order = await gateway.cancelCheckout(ORDER_ID);
+      await gateway.cancelCheckout(ORDER_ID);
 
       const [first, second] = httpService.request.mock.calls.map(
         ([config]) => (config.headers as Record<string, string>)['X-Idempotency-Key'],
       );
 
-      expect(order).toEqual({ id: ORDER_ID, status: MercadoPagoOrderStatus.CANCELED });
+      expect(order).toEqual({ id: ORDER_ID, status: CheckoutStatus.CANCELLED });
 
       expect(httpService.request).toHaveBeenCalledWith({
         method: 'POST',
@@ -196,7 +217,7 @@ describe('HttpMercadoPagoOrderGateway', () => {
       async (status) => {
         httpService.request.mockReturnValue(failWith(status));
 
-        const error = await gateway.cancelOrder(ORDER_ID).catch((e: unknown) => e);
+        const error = await gateway.cancelCheckout(ORDER_ID).catch((e: unknown) => e);
 
         expect(error).toBeInstanceOf(ServiceRequestRejectedException);
         expect(error).toMatchObject({
@@ -223,9 +244,9 @@ describe('HttpMercadoPagoOrderGateway', () => {
       httpService.request.mockReturnValue(failWith(status));
 
       const calls = {
-        create: () => gateway.createOrder(CREATION_REQUEST),
-        find: () => gateway.findOrderById(ORDER_ID),
-        cancel: () => gateway.cancelOrder(ORDER_ID),
+        create: () => gateway.createCheckout(CREATION_REQUEST),
+        find: () => gateway.findCheckoutById(ORDER_ID),
+        cancel: () => gateway.cancelCheckout(ORDER_ID),
       };
 
       const error = await calls[operation]().catch((e: unknown) => e);

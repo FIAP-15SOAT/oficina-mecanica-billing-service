@@ -8,22 +8,34 @@ import { firstValueFrom } from 'rxjs';
 
 import { ServiceRequestRejectedException } from '@application/exceptions/service-request-rejected.exception';
 import {
-  IMercadoPagoOrderGateway,
-  MercadoPagoOrderCreationRequest,
-} from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.interface';
+  CheckoutCreationRequest,
+  IPaymentProviderGateway,
+} from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.interface';
 import {
-  MercadoPagoCheckoutOrderGatewayResponse,
-  MercadoPagoOrderGatewayResponse,
-  MercadoPagoOrderStatus,
-} from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.response';
+  CheckoutGatewayResponse,
+  CheckoutStatus,
+  CreatedCheckoutGatewayResponse,
+} from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.response';
 import { ServiceIntegrationException } from '@infrastructure/exceptions/service-integration.exception';
 
 const CREATE_UNAVAILABLE_MESSAGE =
   'Não foi possível criar a cobrança no Mercado Pago. Nada foi gravado; tente novamente';
 
+const CHECKOUT_STATUS_BY_ORDER_STATUS = new Map<string, CheckoutStatus>([
+  ['created', CheckoutStatus.OPEN],
+  ['action_required', CheckoutStatus.IN_PROGRESS],
+  ['processing', CheckoutStatus.IN_PROGRESS],
+  ['processed', CheckoutStatus.PAID],
+  ['expired', CheckoutStatus.EXPIRED],
+  ['canceled', CheckoutStatus.CANCELLED],
+  ['failed', CheckoutStatus.FAILED],
+  ['refunded', CheckoutStatus.REFUNDED],
+  ['charged_back', CheckoutStatus.CHARGED_BACK],
+]);
+
 interface OrderBody {
   id?: string;
-  status: MercadoPagoOrderStatus;
+  status: string;
   checkout_url?: string;
 }
 
@@ -37,7 +49,7 @@ interface OrdersApiRequest {
 }
 
 @Injectable()
-export class HttpMercadoPagoOrderGateway implements IMercadoPagoOrderGateway {
+export class HttpMercadoPagoOrderGateway implements IPaymentProviderGateway {
   private readonly apiUrl: string;
   private readonly accessToken: string;
 
@@ -49,9 +61,7 @@ export class HttpMercadoPagoOrderGateway implements IMercadoPagoOrderGateway {
     this.accessToken = configService.getOrThrow<string>('MERCADOPAGO_ACCESS_TOKEN');
   }
 
-  async createOrder(
-    request: MercadoPagoOrderCreationRequest,
-  ): Promise<MercadoPagoCheckoutOrderGatewayResponse> {
+  async createCheckout(request: CheckoutCreationRequest): Promise<CreatedCheckoutGatewayResponse> {
     const order = await this.requestOrdersApi({
       method: 'POST',
       path: '/v1/orders',
@@ -73,31 +83,35 @@ export class HttpMercadoPagoOrderGateway implements IMercadoPagoOrderGateway {
       throw new ServiceIntegrationException(CREATE_UNAVAILABLE_MESSAGE);
     }
 
-    return { id: order.id, status: order.status, checkoutUrl: order.checkout_url };
+    return {
+      id: order.id,
+      status: this.toCheckoutStatus(order.status),
+      checkoutUrl: order.checkout_url,
+    };
   }
 
-  async findOrderById(orderId: string): Promise<MercadoPagoOrderGatewayResponse> {
+  async findCheckoutById(checkoutId: string): Promise<CheckoutGatewayResponse> {
     const { id, status } = await this.requestOrdersApi({
       method: 'GET',
-      path: `/v1/orders/${orderId}`,
+      path: `/v1/orders/${checkoutId}`,
       unavailableMessage: 'Não foi possível consultar a order no Mercado Pago. Tente novamente',
     });
 
-    return { id: id as string, status };
+    return { id: id as string, status: this.toCheckoutStatus(status) };
   }
 
-  async cancelOrder(orderId: string): Promise<MercadoPagoOrderGatewayResponse> {
+  async cancelCheckout(checkoutId: string): Promise<CheckoutGatewayResponse> {
     // Cancelling an already cancelled order is harmless, so every call gets its own key.
     const { id, status } = await this.requestOrdersApi({
       method: 'POST',
-      path: `/v1/orders/${orderId}/cancel`,
+      path: `/v1/orders/${checkoutId}/cancel`,
       idempotencyKey: randomUUID(),
       unavailableMessage:
         'Não foi possível cancelar a order no Mercado Pago. Nada mudou; tente novamente',
       rejectedStatuses: new Set([400, 409, 422]),
     });
 
-    return { id: id as string, status };
+    return { id: id as string, status: this.toCheckoutStatus(status) };
   }
 
   private async requestOrdersApi(request: OrdersApiRequest): Promise<OrderBody> {
@@ -139,5 +153,10 @@ export class HttpMercadoPagoOrderGateway implements IMercadoPagoOrderGateway {
     }
 
     return new ServiceIntegrationException(unavailableMessage);
+  }
+
+  // A status Mercado Pago adds later keeps the payment open, like a payment still being made.
+  private toCheckoutStatus(orderStatus: string): CheckoutStatus {
+    return CHECKOUT_STATUS_BY_ORDER_STATUS.get(orderStatus) ?? CheckoutStatus.IN_PROGRESS;
   }
 }

@@ -1,4 +1,4 @@
-import { MercadoPagoOrderStatus } from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.response';
+import { CheckoutStatus } from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.response';
 import { PaymentStatus } from '@domain/enums/payment-status.enum';
 import { QuoteStatus } from '@domain/enums/quote-status.enum';
 
@@ -33,13 +33,13 @@ export const BUSINESS_EVENTS = {
   PAYMENT_REQUESTED: defineLogEvent<{ paymentId: string; workOrderId: string; checkoutId: string }>(
     {
       name: 'payment.requested',
-      message: 'payment requested with a Mercado Pago checkout',
+      message: 'payment requested with a payment provider checkout',
       level: 'info',
     },
   ),
   PAYMENT_APPROVED: defineLogEvent<{ paymentId: string; workOrderId: string; checkoutId: string }>({
     name: 'payment.approved',
-    message: 'payment approved by the Mercado Pago order',
+    message: 'payment approved by the payment provider checkout',
     level: 'info',
   }),
   PAYMENT_CANCELLED: defineLogEvent<{ paymentId: string; workOrderId: string; checkoutId: string }>(
@@ -64,20 +64,31 @@ export const BUSINESS_EVENTS = {
     workOrderId?: string;
     checkoutId: string;
     paymentStatus?: PaymentStatus;
-    checkoutStatus?: MercadoPagoOrderStatus;
+    checkoutStatus?: CheckoutStatus;
   }>({
     name: 'payment.sync_skipped',
     message: 'payment status sync skipped without changing the payment',
+    level: 'info',
+  }),
+  PAYMENT_CANCELLATION_SKIPPED: defineLogEvent<{
+    paymentId: string;
+    workOrderId: string;
+    checkoutId: string;
+    paymentStatus?: PaymentStatus;
+    checkoutStatus?: CheckoutStatus;
+  }>({
+    name: 'payment.cancellation_skipped',
+    message: 'payment cancellation refused without changing the payment',
     level: 'info',
   }),
   PAYMENT_CHECKOUT_REVERSED: defineLogEvent<{
     paymentId: string;
     workOrderId: string;
     checkoutId: string;
-    checkoutStatus: MercadoPagoOrderStatus;
+    checkoutStatus: CheckoutStatus;
   }>({
     name: 'payment.checkout_reversed',
-    message: 'Mercado Pago order refunded or charged back; the payment was not changed',
+    message: 'payment provider checkout refunded or charged back; the payment was not changed',
     level: 'warn',
   }),
 } as const;

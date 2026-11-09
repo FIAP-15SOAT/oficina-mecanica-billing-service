@@ -19,6 +19,7 @@ describe('PaymentController (http)', () => {
       { execute: jest.fn() },
       { execute: jest.fn() },
       { execute: jest.fn() },
+      { execute: jest.fn() },
     );
 
     httpController = new PaymentController(cleanController);
@@ -56,5 +57,15 @@ describe('PaymentController (http)', () => {
 
     await expect(httpController.findAll(query)).resolves.toBe(response);
     expect(cleanController.findAll).toHaveBeenCalledWith(query);
+  });
+
+  it('should return the cancelled payment', async () => {
+    const payment = createMockPayment({ status: PaymentStatus.CANCELLED });
+    const response = PaymentPresenter.toDataResponse(payment);
+
+    jest.spyOn(cleanController, 'cancel').mockResolvedValue(response);
+
+    await expect(httpController.cancel(payment.id)).resolves.toBe(response);
+    expect(cleanController.cancel).toHaveBeenCalledWith(payment.id);
   });
 });

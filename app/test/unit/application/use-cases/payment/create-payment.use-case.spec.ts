@@ -3,8 +3,8 @@ import { WorkOrderBalanceReader } from '@application/services/work-order-balance
 import { BUSINESS_EVENTS } from '@application/logging/business-event.catalog';
 import { BUSINESS_METRICS } from '@application/metrics/business-metric.catalog';
 import { ResourceConflictException } from '@application/exceptions/resource-conflict.exception';
-import { IMercadoPagoOrderGateway } from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.interface';
-import { MercadoPagoOrderStatus } from '@application/ports/output/gateways/mercado-pago/mercado-pago-order-gateway.response';
+import { IPaymentProviderGateway } from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.interface';
+import { CheckoutStatus } from '@application/ports/output/gateways/payment-provider/payment-provider-gateway.response';
 import { IWorkOrderGateway } from '@application/ports/output/gateways/work-order/work-order-gateway.interface';
 import { WorkOrderStatus } from '@application/ports/output/gateways/work-order/work-order-gateway.response';
 import { ILogger } from '@application/ports/output/services/logger.service.interface';
@@ -19,7 +19,7 @@ import { IRepositories, IUnitOfWork } from '@domain/interfaces/repositories/unit
 import { ServiceIntegrationException } from '@infrastructure/exceptions/service-integration.exception';
 
 import { createMockLogger } from '../../../../helpers/logger-mock.factory';
-import { createMockMercadoPagoOrderGateway } from '../../../../helpers/mercado-pago-order-gateway-mock.factory';
+import { createMockPaymentProviderGateway } from '../../../../helpers/payment-provider-gateway-mock.factory';
 import { createMockMetrics } from '../../../../helpers/metrics-mock.factory';
 import {
   createMockPayment,
@@ -52,7 +52,7 @@ describe('CreatePaymentUseCase', () => {
   let quoteRepository: jest.Mocked<IQuoteRepository>;
   let paymentRepository: jest.Mocked<IPaymentRepository>;
   let workOrderGateway: jest.Mocked<IWorkOrderGateway>;
-  let mercadoPagoOrderGateway: jest.Mocked<IMercadoPagoOrderGateway>;
+  let paymentProviderGateway: jest.Mocked<IPaymentProviderGateway>;
   let logger: jest.Mocked<ILogger>;
   let metrics: jest.Mocked<IMetrics>;
 
@@ -83,10 +83,10 @@ describe('CreatePaymentUseCase', () => {
     workOrderGateway = createMockWorkOrderGateway();
     workOrderGateway.findById.mockResolvedValue(workOrder);
 
-    mercadoPagoOrderGateway = createMockMercadoPagoOrderGateway();
-    mercadoPagoOrderGateway.createOrder.mockResolvedValue({
+    paymentProviderGateway = createMockPaymentProviderGateway();
+    paymentProviderGateway.createCheckout.mockResolvedValue({
       id: checkoutId,
-      status: MercadoPagoOrderStatus.CREATED,
+      status: CheckoutStatus.OPEN,
       checkoutUrl,
     });
 
@@ -97,7 +97,7 @@ describe('CreatePaymentUseCase', () => {
     useCase = new CreatePaymentUseCase(
       unitOfWork,
       workOrderGateway,
-      mercadoPagoOrderGateway,
+      paymentProviderGateway,
       new WorkOrderBalanceReader(quoteRepository, paymentRepository),
       logger,
       metrics,
@@ -109,7 +109,7 @@ describe('CreatePaymentUseCase', () => {
     jest.useRealTimers();
   });
 
-  it('should create the order and save the PENDING payment with the requested message in one transaction', async () => {
+  it('should create the checkout and save the PENDING payment with the requested message in one transaction', async () => {
     const payment = await useCase.execute({ workOrderId: workOrder.id, amount: 100 });
 
     expect(payment).toMatchObject({
@@ -141,7 +141,7 @@ describe('CreatePaymentUseCase', () => {
 
     expect(workOrderGateway.findById).toHaveBeenCalledWith(workOrder.id);
 
-    expect(mercadoPagoOrderGateway.createOrder).toHaveBeenCalledWith({
+    expect(paymentProviderGateway.createCheckout).toHaveBeenCalledWith({
       paymentId: payment.id,
       amount: '100.50',
       title: 'Ordem de serviço 000123',
@@ -154,7 +154,7 @@ describe('CreatePaymentUseCase', () => {
       (status) => status !== WorkOrderStatus.APPROVED && status !== WorkOrderStatus.COMPLETED,
     ),
   )(
-    'should refuse a work order outside APPROVED or COMPLETED without calling Mercado Pago (%s)',
+    'should refuse a work order outside APPROVED or COMPLETED without calling the payment provider (%s)',
     async (status) => {
       workOrderGateway.findById.mockResolvedValue({ ...workOrder, status });
 
@@ -164,7 +164,7 @@ describe('CreatePaymentUseCase', () => {
       await expect(execution).rejects.toThrow(
         `Cobrança só pode ser criada com a Ordem de Serviço em um dos seguintes status: APPROVED ou COMPLETED. Status atual: "${status}"`,
       );
-      expect(mercadoPagoOrderGateway.createOrder).not.toHaveBeenCalled();
+      expect(paymentProviderGateway.createCheckout).not.toHaveBeenCalled();
     },
   );
 
@@ -179,7 +179,7 @@ describe('CreatePaymentUseCase', () => {
     ).resolves.toMatchObject({ status: PaymentStatus.PENDING });
   });
 
-  it('should refuse a second pending payment without calling Mercado Pago', async () => {
+  it('should refuse a second pending payment without calling the payment provider', async () => {
     paymentRepository.findByWorkOrderId.mockResolvedValue([
       createMockPayment({ workOrderId: workOrder.id, status: PaymentStatus.PENDING }),
     ]);
@@ -188,10 +188,10 @@ describe('CreatePaymentUseCase', () => {
 
     await expect(execution).rejects.toThrow(ResourceConflictException);
     await expect(execution).rejects.toThrow('A ordem de serviço já tem uma cobrança pendente');
-    expect(mercadoPagoOrderGateway.createOrder).not.toHaveBeenCalled();
+    expect(paymentProviderGateway.createCheckout).not.toHaveBeenCalled();
   });
 
-  it('should refuse an amount above the balance without calling Mercado Pago', async () => {
+  it('should refuse an amount above the balance without calling the payment provider', async () => {
     paymentRepository.findByWorkOrderId.mockResolvedValue([
       createMockPayment({ workOrderId: workOrder.id, amount: 450, status: PaymentStatus.APPROVED }),
     ]);
@@ -202,11 +202,11 @@ describe('CreatePaymentUseCase', () => {
     await expect(execution).rejects.toThrow(
       'O valor da cobrança não pode ser maior que o saldo da ordem de serviço. Saldo atual: 50.00',
     );
-    expect(mercadoPagoOrderGateway.createOrder).not.toHaveBeenCalled();
+    expect(paymentProviderGateway.createCheckout).not.toHaveBeenCalled();
   });
 
-  it('should save nothing when Mercado Pago fails', async () => {
-    mercadoPagoOrderGateway.createOrder.mockRejectedValue(
+  it('should save nothing when the payment provider fails', async () => {
+    paymentProviderGateway.createCheckout.mockRejectedValue(
       new ServiceIntegrationException(
         'Não foi possível criar a cobrança no Mercado Pago. Nada foi gravado; tente novamente',
       ),
@@ -257,7 +257,7 @@ describe('CreatePaymentUseCase', () => {
         new CreatePaymentUseCase(
           unitOfWork,
           workOrderGateway,
-          mercadoPagoOrderGateway,
+          paymentProviderGateway,
           new WorkOrderBalanceReader(quoteRepository, paymentRepository),
           logger,
           metrics,

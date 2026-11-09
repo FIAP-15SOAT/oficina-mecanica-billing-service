@@ -9,6 +9,7 @@ import { CreatePaymentRequest } from '@interface-adapters/payment/requests/creat
 import { ICreatePaymentUseCase } from '@application/ports/input/payment/create-payment.use-case.interface';
 import { IFindAllPaymentsPaginatedUseCase } from '@application/ports/input/payment/find-all-payments-paginated.use-case.interface';
 import { IFindPaymentByIdUseCase } from '@application/ports/input/payment/find-payment-by-id.use-case.interface';
+import { ICancelPaymentUseCase } from '@application/ports/input/payment/cancel-payment.use-case.interface';
 
 import { createMockPayment } from '../../../helpers/payment-mock.factory';
 
@@ -16,6 +17,7 @@ describe('PaymentController', () => {
   let createPaymentUseCase: jest.Mocked<ICreatePaymentUseCase>;
   let findPaymentByIdUseCase: jest.Mocked<IFindPaymentByIdUseCase>;
   let findAllPaymentsPaginatedUseCase: jest.Mocked<IFindAllPaymentsPaginatedUseCase>;
+  let cancelPaymentUseCase: jest.Mocked<ICancelPaymentUseCase>;
   let controller: PaymentController;
 
   beforeEach(() => {
@@ -25,10 +27,13 @@ describe('PaymentController', () => {
 
     findAllPaymentsPaginatedUseCase = { execute: jest.fn() };
 
+    cancelPaymentUseCase = { execute: jest.fn() };
+
     controller = new PaymentController(
       createPaymentUseCase,
       findPaymentByIdUseCase,
       findAllPaymentsPaginatedUseCase,
+      cancelPaymentUseCase,
     );
   });
 
@@ -91,5 +96,17 @@ describe('PaymentController', () => {
       page: 3,
       limit: 20,
     });
+  });
+
+  it('should return the cancelled payment', async () => {
+    const payment = createMockPayment({ status: PaymentStatus.CANCELLED });
+
+    cancelPaymentUseCase.execute.mockResolvedValue(payment);
+
+    await expect(controller.cancel(payment.id)).resolves.toEqual(
+      PaymentPresenter.toDataResponse(payment),
+    );
+
+    expect(cancelPaymentUseCase.execute).toHaveBeenCalledWith(payment.id);
   });
 });

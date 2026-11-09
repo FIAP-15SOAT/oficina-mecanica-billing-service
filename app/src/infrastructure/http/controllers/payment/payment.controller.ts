@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -60,7 +62,7 @@ export class PaymentController {
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MECHANIC, UserRole.ATTENDANT)
-  @ApiOperation({ summary: 'Criar cobrança no Mercado Pago para Ordem de Serviço' })
+  @ApiOperation({ summary: 'Criar cobrança' })
   @ApiCreatedResponse({
     type: PaymentDataResponseDto,
     description: 'Cobrança criada com o link de pagamento',
@@ -75,7 +77,9 @@ export class PaymentController {
   @ApiUnprocessableEntityResponse({
     description: 'Valor menor ou igual a zero ou acima do saldo da Ordem de Serviço',
   })
-  @ApiServiceUnavailableResponse({ description: 'Work Order ou Mercado Pago indisponível' })
+  @ApiServiceUnavailableResponse({
+    description: 'Serviço de ordens de serviço ou provedor de pagamento indisponível',
+  })
   create(@Body() request: CreatePaymentRequestDto): Promise<PaymentDataResponseDto> {
     return this.controller.create(request);
   }
@@ -91,5 +95,27 @@ export class PaymentController {
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID da cobrança' })
   findOne(@Param('id', ParseUUIDPipe) id: string): Promise<PaymentDataResponseDto> {
     return this.controller.findOne(id);
+  }
+
+  @Post(':id/cancellations')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN, UserRole.MECHANIC, UserRole.ATTENDANT)
+  @ApiOperation({ summary: 'Cancelar cobrança pendente' })
+  @ApiOkResponse({
+    type: PaymentDataResponseDto,
+    description: 'Cobrança encerrada: cancelada ou com o status final do checkout',
+  })
+  @ApiBadRequestResponse({ description: 'ID inválido' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso negado' })
+  @ApiNotFoundResponse({ description: 'Cobrança não encontrada' })
+  @ApiConflictResponse({
+    description:
+      'Cobrança fora de PENDING, já paga ou com pagamento iniciado pelo cliente e não concluído',
+  })
+  @ApiServiceUnavailableResponse({ description: 'Provedor de pagamento indisponível' })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID da cobrança' })
+  cancel(@Param('id', ParseUUIDPipe) id: string): Promise<PaymentDataResponseDto> {
+    return this.controller.cancel(id);
   }
 }
