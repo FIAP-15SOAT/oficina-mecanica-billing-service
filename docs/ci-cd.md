@@ -112,7 +112,7 @@ Como o stub do Work Order responde a OS em `IN_DIAGNOSIS`, a criação de cobran
 | `BOT_APP_ID` | Variable | Organização | CI (`Open Pull Request`) |
 | `BOT_PRIVATE_KEY` | Secret | Organização | CI (`Open Pull Request`) |
 | `STAFF_JWT_PUBLIC_KEY`, `STAFF_JWT_KEY_ID` | Secret | Organização | CD (`jwt-public-keys`) |
-| `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` | Secret | Repositório, environment `production` | CD (`mercadopago`); credenciais de produção da aplicação da conta vendedora de teste ([Runbook](runbook.md#contas-de-teste)) |
+| `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRET` | Secret | Repositório, environment `production` | CD (`mercadopago`); access token e chave secreta do webhook da aplicação da conta vendedora de teste ([Runbook](runbook.md#contas-de-teste)) |
 | `SONAR_TOKEN` | Secret | Repositório | SAST |
 | `ENABLE_DEPLOY` | Variable | Repositório | CD (interruptor do deploy automático) |
 | `EKS_CLUSTER_NAME` | Variable | Repositório | CD |
