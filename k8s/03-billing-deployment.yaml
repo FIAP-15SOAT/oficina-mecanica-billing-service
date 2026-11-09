@@ -62,6 +62,8 @@ spec:
                 name: cache-credentials
             - secretRef:
                 name: jwt-public-keys
+            - secretRef:
+                name: mercadopago
           startupProbe:
             httpGet:
               path: /api/health/live

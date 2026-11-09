@@ -118,6 +118,8 @@ jobs:
         env:
           STAFF_JWT_PUBLIC_KEY: ${{ secrets.STAFF_JWT_PUBLIC_KEY }}
           STAFF_JWT_KEY_ID: ${{ secrets.STAFF_JWT_KEY_ID }}
+          MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_ACCESS_TOKEN }}
+          MERCADOPAGO_WEBHOOK_SECRET: ${{ secrets.MERCADOPAGO_WEBHOOK_SECRET }}
         run: |
           if [ -z "${STAFF_JWT_PUBLIC_KEY}" ]; then
             echo "::error::STAFF_JWT_PUBLIC_KEY não está configurado nos secrets da organização."
@@ -129,6 +131,14 @@ jobs:
           esac
           if [ -z "${STAFF_JWT_KEY_ID}" ]; then
             echo "::error::STAFF_JWT_KEY_ID não está configurado nos secrets da organização."
+            exit 1
+          fi
+          if [ -z "${MERCADOPAGO_ACCESS_TOKEN}" ]; then
+            echo "::error::MERCADOPAGO_ACCESS_TOKEN não está configurado nos secrets do environment production."
+            exit 1
+          fi
+          if [ -z "${MERCADOPAGO_WEBHOOK_SECRET}" ]; then
+            echo "::error::MERCADOPAGO_WEBHOOK_SECRET não está configurado nos secrets do environment production."
             exit 1
           fi
 
@@ -241,6 +251,24 @@ jobs:
           # shellcheck disable=SC2016 # envsubst receives the variable names literally
           yq 'select(.metadata.name == "cache-credentials")' k8s/01-secrets.yaml \
             | envsubst '${CACHE_URL_B64}' \
+            | kubectl apply -f -
+
+      - name: Render and apply Mercado Pago credentials
+        env:
+          MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_ACCESS_TOKEN }}
+          MERCADOPAGO_WEBHOOK_SECRET: ${{ secrets.MERCADOPAGO_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          b64() { printf '%s' "$1" | base64 -w0; }
+          MERCADOPAGO_ACCESS_TOKEN_B64="$(b64 "${MERCADOPAGO_ACCESS_TOKEN}")"
+          MERCADOPAGO_WEBHOOK_SECRET_B64="$(b64 "${MERCADOPAGO_WEBHOOK_SECRET}")"
+          # GitHub masks the raw secrets only, not their base64 form.
+          echo "::add-mask::${MERCADOPAGO_ACCESS_TOKEN_B64}"
+          echo "::add-mask::${MERCADOPAGO_WEBHOOK_SECRET_B64}"
+          export MERCADOPAGO_ACCESS_TOKEN_B64 MERCADOPAGO_WEBHOOK_SECRET_B64
+          # shellcheck disable=SC2016 # envsubst receives the variable names literally
+          yq 'select(.metadata.name == "mercadopago")' k8s/01-secrets.yaml \
+            | envsubst '${MERCADOPAGO_ACCESS_TOKEN_B64} ${MERCADOPAGO_WEBHOOK_SECRET_B64}' \
             | kubectl apply -f -
 
       - name: Render and apply application secrets and ConfigMap
