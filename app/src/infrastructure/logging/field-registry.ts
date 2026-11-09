@@ -87,6 +87,20 @@ export const LOGICAL_FIELDS: Readonly<Record<LogicalFieldName, LogicalFieldDefin
     owner: 'use-case',
     sensitivity: 'identifier',
   },
+  paymentStatus: {
+    key: 'oficina.payment.status',
+    type: 'string',
+    cardinality: 'fixed',
+    owner: 'use-case',
+    sensitivity: 'clear',
+  },
+  checkoutStatus: {
+    key: 'oficina.payment.checkout.status',
+    type: 'string',
+    cardinality: 'fixed',
+    owner: 'use-case',
+    sensitivity: 'clear',
+  },
   port: {
     key: 'oficina.app.port',
     type: 'number',

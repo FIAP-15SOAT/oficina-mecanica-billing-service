@@ -1,10 +1,8 @@
 import { validate as isUuid } from 'uuid';
-import { PaymentStatus } from '../enums/payment-status.enum';
+import { FinalPaymentStatus, PaymentStatus } from '../enums/payment-status.enum';
 import { BusinessRuleViolationException } from '../exceptions/business-rule-violation.exception';
 import { DomainValidationException } from '../exceptions/domain-validation.exception';
 import { MAX_CHECKOUT_ID_LENGTH } from '../constants/validation/payment.constants';
-
-export type ResolvedPaymentStatus = Exclude<PaymentStatus, PaymentStatus.PENDING>;
 
 export interface CreatePaymentProps {
   id: string;
@@ -70,7 +68,7 @@ export class Payment {
     });
   }
 
-  resolve(status: ResolvedPaymentStatus): void {
+  resolve(status: FinalPaymentStatus): void {
     if (this._status !== PaymentStatus.PENDING) {
       throw new BusinessRuleViolationException(
         `Cobrança só pode ser encerrada no status PENDING. Status atual: "${this._status}"`,

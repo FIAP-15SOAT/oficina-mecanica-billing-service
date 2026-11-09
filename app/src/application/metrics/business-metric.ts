@@ -1,6 +1,6 @@
 import { MetricAttributes } from './metric-attribute';
 
-export type BusinessMetricName = 'payment.requested';
+export type BusinessMetricName = 'payment.requested' | 'payment.resolved';
 
 export type MetricInstrumentKind = 'counter' | 'histogram';
 

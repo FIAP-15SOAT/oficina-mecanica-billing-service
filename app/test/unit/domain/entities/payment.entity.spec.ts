@@ -1,10 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import {
-  CreatePaymentProps,
-  Payment,
-  ResolvedPaymentStatus,
-} from '@domain/entities/payment.entity';
-import { PaymentStatus } from '@domain/enums/payment-status.enum';
+import { CreatePaymentProps, Payment } from '@domain/entities/payment.entity';
+import { FinalPaymentStatus, PaymentStatus } from '@domain/enums/payment-status.enum';
 import { BusinessRuleViolationException } from '@domain/exceptions/business-rule-violation.exception';
 import { DomainValidationException } from '@domain/exceptions/domain-validation.exception';
 import { createMockPayment } from '../../../helpers/payment-mock.factory';
@@ -130,7 +126,7 @@ describe('Payment Entity', () => {
   });
 
   describe('resolve()', () => {
-    it.each<ResolvedPaymentStatus>([
+    it.each<FinalPaymentStatus>([
       PaymentStatus.APPROVED,
       PaymentStatus.EXPIRED,
       PaymentStatus.CANCELLED,

@@ -4,6 +4,8 @@ export type LogicalFieldName =
   | 'workOrderId'
   | 'paymentId'
   | 'checkoutId'
+  | 'paymentStatus'
+  | 'checkoutStatus'
   | 'port'
   | 'signal'
   | 'dependencyName'

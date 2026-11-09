@@ -21,11 +21,17 @@ export const METRIC_REGISTRY: Readonly<Record<BusinessMetricName, MetricRegistry
     key: 'oficina.payment.requested',
     aggregation: { type: AggregationType.DEFAULT },
   },
+  'payment.resolved': {
+    key: 'oficina.payment.resolved',
+    aggregation: { type: AggregationType.DEFAULT },
+  },
 };
 
 export const METRIC_ATTRIBUTE_REGISTRY: Readonly<
   Record<MetricAttributeName, MetricAttributeRegistryEntry>
-> = {};
+> = {
+  paymentStatus: { key: 'oficina.payment.status', cardinality: 'fixed' },
+};
 
 /**
  * Entries with the default aggregation produce no View — a "default" View would
