@@ -15,57 +15,84 @@ export interface InternalServicesStub {
   workOrders: Map<string, object>;
   services: Map<string, object>;
   partsSupplies: Map<string, object>;
+  /** Ids whose route answers 500, as a failure of the owner. */
   failingIds: Set<string>;
   close(): Promise<void>;
 }
 
-const RESOURCES: Record<string, { name: string; store: keyof InternalServicesStubStores }> = {
-  'work-orders': { name: 'Ordem de Serviço', store: 'workOrders' },
-  services: { name: 'Serviço', store: 'services' },
-  'parts-supplies': { name: 'Peça/Insumo', store: 'partsSupplies' },
+interface InternalServicesStubResponse {
+  status: number;
+  body: object;
+}
+
+/** Answers one route from its path params. */
+type RouteHandler = (params: Record<string, string>) => InternalServicesStubResponse;
+
+const internalError: InternalServicesStubResponse = {
+  status: 500,
+  body: { statusCode: 500, error: 'Internal Server Error', message: 'Erro interno' },
 };
 
-type InternalServicesStubStores = Pick<
-  InternalServicesStub,
-  'workOrders' | 'services' | 'partsSupplies'
->;
+const notFound = (name: string, id: string): InternalServicesStubResponse => ({
+  status: 404,
+  body: {
+    statusCode: 404,
+    error: 'Not Found',
+    message: `${name} não encontrado(a) com identificador: ${id}`,
+  },
+});
 
-/** Serves the work order and inventory internal routes from in-memory maps. */
+const found = (data: object | undefined, name: string, id: string): InternalServicesStubResponse =>
+  data ? { status: 200, body: { data } } : notFound(name, id);
+
+/** Serves the Work Order and the Inventory internal routes from in-memory maps. */
 export async function startInternalServicesStub(): Promise<InternalServicesStub> {
-  const stores: InternalServicesStubStores = {
-    workOrders: new Map(),
-    services: new Map(),
-    partsSupplies: new Map(),
-  };
+  const workOrders = new Map<string, object>();
+  const services = new Map<string, object>();
+  const partsSupplies = new Map<string, object>();
   const failingIds = new Set<string>();
 
-  const server = createServer((req, res) => {
-    const [, prefix, resource, id] = (req.url ?? '').split('/');
-    const route = prefix === 'internal' ? RESOURCES[resource] : undefined;
-    const data = route && stores[route.store].get(id);
-    const reply = (statusCode: number, body: object): void => {
-      res.writeHead(statusCode, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(body));
-    };
+  const routes = Object.entries<RouteHandler>({
+    'GET /internal/work-orders/:id': ({ id }) => found(workOrders.get(id), 'Ordem de Serviço', id),
+    'GET /internal/services/:id': ({ id }) => found(services.get(id), 'Serviço', id),
+    'GET /internal/parts-supplies/:id': ({ id }) => found(partsSupplies.get(id), 'Peça/Insumo', id),
+  }).map(([route, handle]) => {
+    const [method, pathname] = route.split(' ');
 
-    if (failingIds.has(id)) {
-      reply(500, { statusCode: 500, error: 'Internal Server Error', message: 'Erro interno' });
-    } else if (data) {
-      reply(200, { data });
-    } else {
-      reply(404, {
-        statusCode: 404,
-        error: 'Not Found',
-        message: `${route?.name ?? 'Recurso'} não encontrado(a) com identificador: ${id}`,
-      });
+    return { method, pattern: new URLPattern({ pathname }), handle };
+  });
+
+  const answer = (method: string, path: string): InternalServicesStubResponse => {
+    const { pathname } = new URL(path, 'http://localhost');
+
+    for (const route of routes) {
+      const match = route.method === method ? route.pattern.exec({ pathname }) : null;
+
+      if (match) {
+        // Every param is a required ":name" segment, so a match always captures it.
+        const params = match.pathname.groups as Record<string, string>;
+
+        return failingIds.has(params.id) ? internalError : route.handle(params);
+      }
     }
+
+    return notFound('Recurso', path);
+  };
+
+  const server = createServer((req, res) => {
+    const { status, body } = answer(req.method ?? 'GET', req.url ?? '/');
+
+    res.writeHead(status, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(body));
   });
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
 
   return {
     url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
-    ...stores,
+    workOrders,
+    services,
+    partsSupplies,
     failingIds,
     close: () => new Promise((resolve) => server.close(() => resolve())),
   };

@@ -26,6 +26,22 @@ export interface MercadoPagoStub {
   close(): Promise<void>;
 }
 
+interface MercadoPagoStubResponse {
+  status: number;
+  body: object;
+}
+
+/** Answers one route from its path params and the parsed JSON body. */
+type RouteHandler = (
+  params: Record<string, string>,
+  body: unknown,
+) => MercadoPagoStubResponse | Promise<MercadoPagoStubResponse>;
+
+const orderNotFound: MercadoPagoStubResponse = {
+  status: 404,
+  body: { message: 'order not found' },
+};
+
 async function readBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
 
@@ -49,49 +65,88 @@ export async function startMercadoPagoStub(): Promise<MercadoPagoStub> {
     orderCreationDelayMs: 0,
   };
 
+  const createOrder = async (body: unknown): Promise<MercadoPagoStubResponse> => {
+    await sleep(stub.orderCreationDelayMs);
+
+    sequence += 1;
+
+    const created: MercadoPagoStubOrder = {
+      id: `ORD${String(sequence).padStart(6, '0')}`,
+      status: 'created',
+      external_reference: (body as { external_reference: string }).external_reference,
+      checkout_url: `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${sequence}`,
+    };
+
+    stub.orders.set(created.id, created);
+
+    return { status: 201, body: created };
+  };
+
+  const cancelOrder = (id: string): MercadoPagoStubResponse => {
+    const order = stub.orders.get(id);
+
+    if (!order) {
+      return orderNotFound;
+    }
+
+    if (order.status !== 'created') {
+      return { status: 409, body: { message: 'order cannot be canceled' } };
+    }
+
+    order.status = 'canceled';
+
+    return { status: 200, body: order };
+  };
+
+  const routes = Object.entries<RouteHandler>({
+    'POST /v1/orders': (_params, body) => createOrder(body),
+    'GET /v1/orders/:id': ({ id }) => {
+      const order = stub.orders.get(id);
+
+      return order ? { status: 200, body: order } : orderNotFound;
+    },
+    'POST /v1/orders/:id/cancel': ({ id }) => cancelOrder(id),
+  }).map(([route, handle]) => {
+    const [method, pathname] = route.split(' ');
+
+    return { method, pattern: new URLPattern({ pathname }), handle };
+  });
+
+  const answer = async (
+    method: string,
+    path: string,
+    body: unknown,
+  ): Promise<MercadoPagoStubResponse> => {
+    if (stub.unavailable) {
+      return { status: 503, body: { message: 'service unavailable' } };
+    }
+
+    const { pathname } = new URL(path, 'http://localhost');
+
+    for (const route of routes) {
+      const match = route.method === method ? route.pattern.exec({ pathname }) : null;
+
+      if (match) {
+        // Every param is a required ":name" segment, so a match always captures it.
+        return route.handle(match.pathname.groups as Record<string, string>, body);
+      }
+    }
+
+    return { status: 404, body: { message: 'route not found' } };
+  };
+
   const server = createServer((req, res) => {
     void (async () => {
       const method = req.method ?? 'GET';
       const path = req.url ?? '/';
       const body = await readBody(req);
-      const [, , , id, action] = path.split('/');
-      const order = id === undefined ? undefined : stub.orders.get(id);
-
-      const reply = (statusCode: number, payload: object): void => {
-        res.writeHead(statusCode, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(payload));
-      };
 
       stub.requests.push({ method, path, headers: req.headers, body });
 
-      if (stub.unavailable) {
-        reply(503, { message: 'service unavailable' });
-      } else if (method === 'POST' && path === '/v1/orders') {
-        await sleep(stub.orderCreationDelayMs);
+      const response = await answer(method, path, body);
 
-        sequence += 1;
-
-        const created: MercadoPagoStubOrder = {
-          id: `ORD${String(sequence).padStart(6, '0')}`,
-          status: 'created',
-          external_reference: (body as { external_reference: string }).external_reference,
-          checkout_url: `https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=${sequence}`,
-        };
-
-        stub.orders.set(created.id, created);
-        reply(201, created);
-      } else if (!order) {
-        reply(404, { message: 'order not found' });
-      } else if (method === 'GET' && action === undefined) {
-        reply(200, order);
-      } else if (method === 'POST' && action === 'cancel' && order.status === 'created') {
-        order.status = 'canceled';
-        reply(200, order);
-      } else if (method === 'POST' && action === 'cancel') {
-        reply(409, { message: 'order cannot be canceled' });
-      } else {
-        reply(404, { message: 'route not found' });
-      }
+      res.writeHead(response.status, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(response.body));
     })();
   });
 

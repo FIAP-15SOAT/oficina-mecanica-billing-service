@@ -15,37 +15,55 @@ const readFixtureData = (path) =>
   JSON.parse(readFileSync(join(contractsDir, path), 'utf8')).data;
 
 // IN_DIAGNOSIS lets the scan create and submit quotes for any work order id.
-const fixtures = new Map([
-  [
-    'work-orders',
-    {
-      ...readFixtureData('work-order/internal-work-order.json'),
-      status: 'IN_DIAGNOSIS',
-      services: [],
-      partSupplies: [],
-    },
-  ],
-  ['services', readFixtureData('inventory/internal-service.json')],
-  ['parts-supplies', readFixtureData('inventory/internal-part-supply.json')],
-]);
+const workOrder = {
+  ...readFixtureData('work-order/internal-work-order.json'),
+  status: 'IN_DIAGNOSIS',
+  services: [],
+  partSupplies: [],
+};
+const service = readFixtureData('inventory/internal-service.json');
+const partSupply = readFixtureData('inventory/internal-part-supply.json');
 
-const reply = (res, statusCode, body) => {
-  res.writeHead(statusCode, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(body));
+const notFound = {
+  status: 404,
+  body: { statusCode: 404, error: 'Not Found', message: 'Recurso não encontrado' },
+};
+
+const handlers = {
+  'GET /internal/work-orders/:id': ({ id }) => ({
+    status: 200,
+    body: { data: { ...workOrder, id } },
+  }),
+  'GET /internal/services/:id': ({ id }) => ({ status: 200, body: { data: { ...service, id } } }),
+  'GET /internal/parts-supplies/:id': ({ id }) => ({
+    status: 200,
+    body: { data: { ...partSupply, id } },
+  }),
+};
+
+const routes = Object.entries(handlers).map(([route, handle]) => {
+  const [method, pathname] = route.split(' ');
+
+  return { method, pattern: new URLPattern({ pathname }), handle };
+});
+
+const answer = (req) => {
+  const { pathname } = new URL(req.url ?? '/', 'http://localhost');
+
+  for (const { method, pattern, handle } of routes) {
+    const match = method === req.method ? pattern.exec({ pathname }) : null;
+
+    if (match) {
+      return handle(match.pathname.groups);
+    }
+  }
+
+  return notFound;
 };
 
 createServer((req, res) => {
-  const segments = new URL(req.url ?? '/', 'http://localhost').pathname.split('/');
-  const [, prefix, resource, id] = segments;
+  const { status, body } = answer(req);
 
-  const fixture =
-    req.method === 'GET' && prefix === 'internal' && id && segments.length === 4
-      ? fixtures.get(resource)
-      : undefined;
-
-  if (fixture) {
-    reply(res, 200, { data: { ...fixture, id } });
-  } else {
-    reply(res, 404, { statusCode: 404, error: 'Not Found', message: 'Recurso não encontrado' });
-  }
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(body));
 }).listen(PORT, () => console.log(`internal services stub listening on ${PORT}`));
