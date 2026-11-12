@@ -105,7 +105,12 @@ export interface QuoteListResponse {
   data: QuoteResponse[];
 }
 
+/** Null when the work order service does not know the work order of the quote. */
+export interface QuoteListItemResponse extends Omit<QuoteResponse, 'workOrder'> {
+  workOrder: QuoteWorkOrderResponse | null;
+}
+
 export interface QuotePaginatedResponse {
-  data: QuoteResponse[];
+  data: QuoteListItemResponse[];
   pagination: PaginationMeta;
 }

@@ -179,7 +179,29 @@ describe('QuotePresenter', () => {
     );
 
     expect(response.pagination).toEqual(pagination);
-    expect(response.data[0].workOrder.id).toBe(workOrder.id);
+    expect(response.data[0].workOrder?.id).toBe(workOrder.id);
+  });
+
+  it('should list a quote whose work order was not found without the work order', () => {
+    const workOrder = createMockWorkOrderGatewayResponse();
+    const listed = createMockQuote({ workOrderId: workOrder.id });
+    const orphan = createMockQuote({ workOrderId: createMockWorkOrderGatewayResponse().id });
+    const pagination = { totalRecords: 2, totalPages: 1, page: 1, limit: 10 };
+
+    const response = QuotePresenter.toPaginatedResponse({ items: [orphan, listed], pagination }, [
+      workOrder,
+    ]);
+
+    expect(response.data.map((quote) => [quote.id, quote.workOrder?.id ?? null])).toEqual([
+      [orphan.id, null],
+      [listed.id, workOrder.id],
+    ]);
+
+    expect(response.data[0]).toMatchObject({
+      status: orphan.status,
+      totalAmount: orphan.totalAmount,
+    });
+    expect(response.pagination).toEqual(pagination);
   });
 
   describe('internal responses', () => {

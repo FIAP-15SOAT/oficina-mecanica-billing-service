@@ -9,6 +9,7 @@ import { IUpdateQuotePartSupplyQuantityUseCase } from '@application/ports/input/
 import { IFindAllQuotesPaginatedUseCase } from '@application/ports/input/quote/find-all-quotes-paginated.use-case.interface';
 import { IFindWorkOrderQuotesUseCase } from '@application/ports/input/quote/find-work-order-quotes.use-case.interface';
 import { IFindWorkOrdersByIdsUseCase } from '@application/ports/input/quote/find-work-orders-by-ids.use-case.interface';
+import { IFindExistingWorkOrdersUseCase } from '@application/ports/input/quote/find-existing-work-orders.use-case.interface';
 import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
 import { ISubmitQuoteUseCase } from '@application/ports/input/quote/submit-quote.use-case.interface';
 import { IUpdateQuoteStatusUseCase } from '@application/ports/input/quote/update-quote-status.use-case.interface';
@@ -45,6 +46,7 @@ export class QuoteController {
     private readonly findAllQuotesPaginatedUseCase: IFindAllQuotesPaginatedUseCase,
     private readonly findWorkOrderQuotesUseCase: IFindWorkOrderQuotesUseCase,
     private readonly findWorkOrdersByIdsUseCase: IFindWorkOrdersByIdsUseCase,
+    private readonly findExistingWorkOrdersUseCase: IFindExistingWorkOrdersUseCase,
     private readonly findQuoteItemsCatalogUseCase: IFindQuoteItemsCatalogUseCase,
   ) {}
 
@@ -55,7 +57,7 @@ export class QuoteController {
       limit: query.limit ?? 10,
     });
 
-    const workOrders = await this.findWorkOrdersByIdsUseCase.execute(
+    const workOrders = await this.findExistingWorkOrdersUseCase.execute(
       result.items.map((quote) => quote.workOrderId),
     );
 

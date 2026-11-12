@@ -30,9 +30,16 @@ import {
 
 export class QuotePresenter {
   static toResponse(quote: Quote, workOrder: WorkOrderGatewayResponse): QuoteResponse {
+    return QuotePresenter.withWorkOrder(quote, QuotePresenter.toWorkOrder(workOrder));
+  }
+
+  private static withWorkOrder<TWorkOrder extends QuoteWorkOrderResponse | null>(
+    quote: Quote,
+    workOrder: TWorkOrder,
+  ): Omit<QuoteResponse, 'workOrder'> & { workOrder: TWorkOrder } {
     return {
       id: quote.id,
-      workOrder: QuotePresenter.toWorkOrder(workOrder),
+      workOrder,
       status: quote.status,
       notes: quote.notes,
       sentAt: quote.sentAt,
@@ -119,7 +126,16 @@ export class QuotePresenter {
   ): QuotePaginatedResponse {
     const { items, pagination } = paginatedResult;
 
-    return { data: QuotePresenter.toResponses(items, workOrders), pagination };
+    const data = items.map((quote) => {
+      const workOrder = workOrders.find(({ id }) => id === quote.workOrderId);
+
+      return QuotePresenter.withWorkOrder(
+        quote,
+        workOrder ? QuotePresenter.toWorkOrder(workOrder) : null,
+      );
+    });
+
+    return { data, pagination };
   }
 
   private static toResponses(

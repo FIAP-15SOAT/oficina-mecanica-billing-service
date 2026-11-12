@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { QuoteStatus } from '@domain/enums/quote-status.enum';
 import { UserRole } from '@domain/enums/user-role.enum';
 import { WorkOrderStatus } from '@application/ports/output/gateways/work-order/work-order-gateway.response';
@@ -11,6 +11,7 @@ import {
   QuoteDataResponse,
   QuoteWithItemsDataResponse,
   QuoteListResponse,
+  QuoteListItemResponse,
   QuotePaginatedResponse,
   QuoteWorkOrderAssignedUserResponse,
   QuoteWorkOrderCustomerResponse,
@@ -399,10 +400,22 @@ export class QuoteListResponseDto implements QuoteListResponse {
   data!: QuoteResponseDto[];
 }
 
+export class QuoteListItemResponseDto
+  extends OmitType(QuoteResponseDto, ['workOrder'] as const)
+  implements QuoteListItemResponse
+{
+  @ApiProperty({
+    description: 'Dados da Ordem de Serviço associada',
+    type: QuoteWorkOrderResponseDto,
+    nullable: true,
+  })
+  workOrder!: QuoteWorkOrderResponseDto | null;
+}
+
 export class QuotePaginatedResponseDto
-  extends PaginatedResponseDto<QuoteResponseDto>
+  extends PaginatedResponseDto<QuoteListItemResponseDto>
   implements QuotePaginatedResponse
 {
-  @ApiProperty({ type: [QuoteResponseDto] })
-  data!: QuoteResponseDto[];
+  @ApiProperty({ type: [QuoteListItemResponseDto] })
+  data!: QuoteListItemResponseDto[];
 }

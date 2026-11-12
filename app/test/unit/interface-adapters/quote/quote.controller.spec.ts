@@ -14,6 +14,7 @@ import { IUpdateQuotePartSupplyQuantityUseCase } from '@application/ports/input/
 import { IFindAllQuotesPaginatedUseCase } from '@application/ports/input/quote/find-all-quotes-paginated.use-case.interface';
 import { IFindWorkOrderQuotesUseCase } from '@application/ports/input/quote/find-work-order-quotes.use-case.interface';
 import { IFindWorkOrdersByIdsUseCase } from '@application/ports/input/quote/find-work-orders-by-ids.use-case.interface';
+import { IFindExistingWorkOrdersUseCase } from '@application/ports/input/quote/find-existing-work-orders.use-case.interface';
 import { IFindQuoteItemsCatalogUseCase } from '@application/ports/input/quote/find-quote-items-catalog.use-case.interface';
 import { ISubmitQuoteUseCase } from '@application/ports/input/quote/submit-quote.use-case.interface';
 import { IUpdateQuoteStatusUseCase } from '@application/ports/input/quote/update-quote-status.use-case.interface';
@@ -40,6 +41,7 @@ describe('QuoteController', () => {
   let findAllQuotesPaginatedUseCase: jest.Mocked<IFindAllQuotesPaginatedUseCase>;
   let findWorkOrderQuotesUseCase: jest.Mocked<IFindWorkOrderQuotesUseCase>;
   let findWorkOrdersByIdsUseCase: jest.Mocked<IFindWorkOrdersByIdsUseCase>;
+  let findExistingWorkOrdersUseCase: jest.Mocked<IFindExistingWorkOrdersUseCase>;
   let findQuoteItemsCatalogUseCase: jest.Mocked<IFindQuoteItemsCatalogUseCase>;
   let controller: QuoteController;
 
@@ -70,6 +72,8 @@ describe('QuoteController', () => {
 
     findWorkOrdersByIdsUseCase = { execute: jest.fn().mockResolvedValue([workOrder]) };
 
+    findExistingWorkOrdersUseCase = { execute: jest.fn().mockResolvedValue([workOrder]) };
+
     findQuoteItemsCatalogUseCase = { execute: jest.fn() };
 
     controller = new QuoteController(
@@ -86,6 +90,7 @@ describe('QuoteController', () => {
       findAllQuotesPaginatedUseCase,
       findWorkOrderQuotesUseCase,
       findWorkOrdersByIdsUseCase,
+      findExistingWorkOrdersUseCase,
       findQuoteItemsCatalogUseCase,
     );
   });
@@ -191,7 +196,7 @@ describe('QuoteController', () => {
     });
   });
 
-  it('should read each distinct work order once for a list', async () => {
+  it('should read the existing work orders of a list page', async () => {
     const quotes = [quote, createMockQuote({ workOrderId: workOrder.id })];
 
     findAllQuotesPaginatedUseCase.execute.mockResolvedValue({
@@ -201,9 +206,13 @@ describe('QuoteController', () => {
 
     const response = await controller.findAll({ page: 2, limit: 5 });
 
-    expect(findWorkOrdersByIdsUseCase.execute).toHaveBeenCalledTimes(1);
-    expect(findWorkOrdersByIdsUseCase.execute).toHaveBeenCalledWith([workOrder.id, workOrder.id]);
-    expect(response.data.map((item) => item.workOrder.id)).toEqual([workOrder.id, workOrder.id]);
+    expect(findExistingWorkOrdersUseCase.execute).toHaveBeenCalledTimes(1);
+    expect(findExistingWorkOrdersUseCase.execute).toHaveBeenCalledWith([
+      workOrder.id,
+      workOrder.id,
+    ]);
+    expect(findWorkOrdersByIdsUseCase.execute).not.toHaveBeenCalled();
+    expect(response.data.map((item) => item.workOrder?.id)).toEqual([workOrder.id, workOrder.id]);
   });
 
   it('should list the quotes of a work order', async () => {

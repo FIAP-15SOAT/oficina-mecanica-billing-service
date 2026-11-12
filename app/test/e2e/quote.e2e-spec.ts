@@ -1100,6 +1100,27 @@ describe('Quote (E2E)', () => {
         ).toEqual(expect.arrayContaining([first.workOrderId, second.workOrderId]));
       });
 
+      it('should list without the work order a quote whose work order the Work Order does not know', async () => {
+        const listed = await createQuote();
+        const orphan = await createQuote();
+
+        stub.workOrders.delete(orphan.workOrderId);
+
+        const res = await api.get('/api/quotes?page=1&limit=10').expect(200);
+
+        expect(res.body.data).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: orphan.id, workOrder: null }),
+            expect.objectContaining({
+              id: listed.id,
+              workOrder: expect.objectContaining({ id: listed.workOrderId }),
+            }),
+          ]),
+        );
+
+        expect(res.body.pagination).toEqual({ totalRecords: 2, totalPages: 1, page: 1, limit: 10 });
+      });
+
       it('should filter the quotes by workOrderId', async () => {
         const { id, workOrderId } = await createQuote();
         await createQuote();

@@ -30,6 +30,12 @@ export const BUSINESS_EVENTS = {
     message: 'quote approval revert skipped because the quote is not APPROVED',
     level: 'info',
   }),
+  QUOTE_WORK_ORDER_MISSING: defineLogEvent<{ workOrderId: string }>({
+    name: 'quote.work_order_missing',
+    message:
+      'quotes listed without their work order because the work order service does not know it',
+    level: 'warn',
+  }),
   PAYMENT_REQUESTED: defineLogEvent<{ paymentId: string; workOrderId: string; checkoutId: string }>(
     {
       name: 'payment.requested',
