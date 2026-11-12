@@ -94,7 +94,7 @@ O agregado `Quote` guarda a OS só pelo id (`workOrderId`), os itens `QuoteServi
 
 A violação de uma regra responde 409; o ciclo de vida completo está em [API › Ciclo de vida do orçamento](api.md#ciclo-de-vida-do-orçamento) e as tabelas, em [Banco de dados](database.md).
 
-O preço vem do Inventory na inclusão: o `QuoteItemValidator` busca serviços e peças por id, em paralelo, e o item grava `basePrice` ou `salePrice`. Nome, descrição, SKU, unidade e categoria não são copiados: o Clean Controller os lê no Inventory a cada resposta, assim como o resumo da OS, lido no Work Order uma vez por OS distinta. Nas rotas que gravam, essas leituras vêm antes do caso de uso: com o dono fora do ar, a rota responde 503 sem gravar nada.
+O preço vem do Inventory na inclusão: o `QuoteItemValidator` busca serviços e peças por id, em paralelo, e o item grava `basePrice` ou `salePrice`. Nome, descrição, SKU, unidade e categoria não são copiados: o Clean Controller os lê no Inventory a cada resposta, assim como o resumo da OS, lido no Work Order uma vez por OS distinta. Nas rotas que gravam, essas leituras vêm antes do caso de uso: com o dono fora do ar, a rota responde 503 sem gravar nada. Só a listagem paginada tolera uma OS que o Work Order não conhece: o `FindExistingWorkOrdersUseCase` deixa de fora a OS que responde 404, registra `quote.work_order_missing` e o orçamento sai com `workOrder: null`, porque um orçamento inicial pode sobrar sem OS quando a abertura falha no Work Order.
 
 ## Política de status da OS
 

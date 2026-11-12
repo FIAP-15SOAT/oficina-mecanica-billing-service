@@ -82,6 +82,7 @@ Falta de motivo, ou motivo só com espaços, responde **400**. Orçamento fora d
 O orçamento traz `id`, o resumo da OS em `workOrder`, `status`, `notes`, `sentAt`, `approvedAt`, `rejectedAt`, `servicesAmount`, `partsAmount`, `totalAmount`, `createdAt` e `updatedAt`. O detalhe acrescenta `services[]` (`id`, `name`, `description`, `quantity`, `unitPrice`, `totalPrice`) e `partsSupplies[]` (os mesmos campos mais `sku`, `partNumber`, `category` e `unit`).
 
 - `workOrder` vem do Work Order a cada leitura (número, status, cliente, veículo, responsável e datas), lido uma vez por OS distinta e em paralelo; Work Order fora do ar responde **503**. Nas rotas que gravam, a OS é lida antes da gravação, então esse 503 não deixa nada gravado.
+- Na listagem paginada (`GET /api/quotes`), um orçamento cuja OS o Work Order não conhece (`404`) aparece com `workOrder: null`, e o Billing registra o evento de log `quote.work_order_missing` (`warn`) com o id da OS. Isso acontece com um orçamento inicial que ficou sem OS, por exemplo quando o Work Order desistiu de esperar a resposta do `POST /internal/quotes` e não chegou a gravar a OS. Nas outras rotas, a mesma OS desconhecida responde **404**.
 - Nome, descrição, SKU, unidade e categoria dos itens vêm do Inventory a cada leitura. Item que o Inventory não tem mais aparece com esses campos `null`, sem erro; Inventory fora do ar responde **503**. Preço e quantidade são sempre os do orçamento.
 
 ## Orçamentos de uma ordem de serviço

@@ -20,6 +20,7 @@ import { UpdateQuotePartSupplyQuantityUseCase } from '@application/use-cases/quo
 import { FindAllQuotesPaginatedUseCase } from '@application/use-cases/quote/find-all-quotes-paginated.use-case';
 import { FindWorkOrderQuotesUseCase } from '@application/use-cases/quote/find-work-order-quotes.use-case';
 import { FindWorkOrdersByIdsUseCase } from '@application/use-cases/quote/find-work-orders-by-ids.use-case';
+import { FindExistingWorkOrdersUseCase } from '@application/use-cases/quote/find-existing-work-orders.use-case';
 import { FindQuoteItemsCatalogUseCase } from '@application/use-cases/quote/find-quote-items-catalog.use-case';
 import { SubmitQuoteUseCase } from '@application/use-cases/quote/submit-quote.use-case';
 import { ApproveQuoteUseCase } from '@application/use-cases/quote/approve-quote.use-case';
@@ -88,6 +89,7 @@ import { WorkOrderQuoteController } from './work-order-quote.controller';
           new FindAllQuotesPaginatedUseCase(quoteRepository),
           new FindWorkOrderQuotesUseCase(quoteRepository, cache),
           new FindWorkOrdersByIdsUseCase(workOrderGateway),
+          new FindExistingWorkOrdersUseCase(workOrderGateway, logger),
           new FindQuoteItemsCatalogUseCase(inventoryCatalogGateway),
         );
       },
