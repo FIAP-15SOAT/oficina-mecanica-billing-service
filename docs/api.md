@@ -18,7 +18,7 @@
 ## Acesso
 
 - **Swagger:** `http://localhost:3002/api/docs`
-- **Base URL:** `http://localhost:3002/api` (local). No cluster, o Billing responde no listener `8082` do NLB interno. O API Gateway publica do Billing `GET /health/billing`, `GET /docs/billing`, `POST /webhooks/mercadopago` e `/api/payments`, e encaminha `/api/quotes` e `GET /api/work-orders/{id}/quotes` ao Work Order.
+- **Base URL:** `http://localhost:3002/api` (local). No cluster, o Billing responde no listener `8082` do NLB interno, o Network Load Balancer que liga o API Gateway aos serviços. O API Gateway encaminha a ele `/api/quotes` e `/api/quotes/*`, `GET /api/work-orders/{id}/quotes`, `/api/payments` e `/api/payments/*`, `POST /webhooks/mercadopago`, `GET /health/billing` e `GET /docs/billing`; a decisão do cliente sobre o orçamento (`/api/me/quotes/*`) segue para o Work Order, que a repassa ao Billing.
 
 Toda rota de `/api` exige `Authorization: Bearer <token>` com o token RS256 de **funcionário** emitido pelo Identity, validado localmente (assinatura, `kid`, `iss`, `aud`, `exp`, `typ = access` e `role`). Só as rotas de saúde e o Swagger respondem sem token. O webhook do Mercado Pago, fora de `/api`, também não leva token: ele é autenticado pela assinatura `x-signature`. Token de cliente, expirado ou assinado por outra chave responde **401**; papel sem permissão na rota responde **403**.
 
