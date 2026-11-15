@@ -19,72 +19,91 @@
       "name": "Health",
       "item": [
         {
-          "name": "Vivacidade responde sem credencial",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Corpo mínimo e fixo', () => pm.expect(pm.response.json()).to.eql({ status: 'ok' }));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
-            "auth": {
-              "type": "noauth"
-            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/health/live",
+              "raw": "{{baseUrl}}/health/billing",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
                 "health",
-                "live"
+                "billing"
               ]
+            },
+            "auth": {
+              "type": "noauth"
             }
           },
-          "response": []
-        },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Corpo ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ]
+              }
+            }
+          ],
+          "name": "Prontidão do billing pelo API Gateway"
+        }
+      ]
+    },
+    {
+      "name": "Autenticação",
+      "description": "O login do funcionário é do Identity, pelo mesmo API Gateway; grava o authToken que as outras pastas usam.",
+      "item": [
         {
-          "name": "Prontidão responde com o banco acessível",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
-                  "pm.test('Corpo mínimo e fixo', () => pm.expect(pm.response.json()).to.eql({ status: 'ok' }));"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
           "request": {
-            "auth": {
-              "type": "noauth"
-            },
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/api/health/ready",
+              "raw": "{{baseUrl}}/api/auth/login",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "health",
-                "ready"
+                "auth",
+                "login"
               ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
-          "response": []
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('authToken', pm.response.json().data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "name": "Login do funcionário no Identity"
         }
       ]
     },
@@ -92,7 +111,24 @@
       "name": "Documentação",
       "item": [
         {
-          "name": "Documento OpenAPI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/docs/billing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "docs",
+                "billing"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
           "event": [
             {
               "listen": "test",
@@ -105,24 +141,7 @@
               }
             }
           ],
-          "request": {
-            "auth": {
-              "type": "noauth"
-            },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/docs-json",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "docs-json"
-              ]
-            }
-          },
-          "response": []
+          "name": "Documento OpenAPI pelo API Gateway"
         }
       ]
     },
@@ -1534,45 +1553,6 @@
           "response": []
         },
         {
-          "name": "Criar cobrança com a OS fora de APPROVED e COMPLETED (409)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
-                  "pm.test('Mensagem de erro esperada', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.include('APPROVED ou COMPLETED'); });"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/payments",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "payments"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"workOrderId\": \"{{workOrderId}}\",\n  \"amount\": 100\n}"
-            }
-          },
-          "response": []
-        },
-        {
           "name": "Criar cobrança (201)",
           "event": [
             {
@@ -1613,16 +1593,38 @@
           "response": []
         },
         {
-          "name": "Criar segunda cobrança pendente (409)",
+          "name": "Criar segunda cobrança com a OS aguardando o pagamento (409)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The work order holds the payment order in AWAITING_PAYMENT once it consumes billing.payment.requested.",
+                  "function waitForAwaitingPayment(attempt) {",
+                  "    pm.sendRequest({",
+                  "        url: pm.environment.get('baseUrl') + '/api/work-orders/' + pm.environment.get('paymentWorkOrderId'),",
+                  "        method: 'GET',",
+                  "        header: { Authorization: 'Bearer ' + pm.environment.get('authToken') }",
+                  "    }, (err, res) => {",
+                  "        const status = !err && res.code === 200 ? res.json().data.status : null;",
+                  "",
+                  "        if (status !== 'AWAITING_PAYMENT' && attempt < 15) setTimeout(() => waitForAwaitingPayment(attempt + 1), 1000);",
+                  "    });",
+                  "}",
+                  "",
+                  "waitForAwaitingPayment(1);"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
-                  "pm.test('Mensagem de erro esperada', () => { const res = pm.response.json(); pm.expect(res.statusCode).to.eql(409); pm.expect(res.message).to.include('cobrança pendente'); });"
-                ],
-                "type": "text/javascript"
+                  "pm.test('Mensagem de erro esperada', () => pm.expect(pm.response.json().message).to.include('APPROVED ou COMPLETED'));"
+                ]
               }
             }
           ],
