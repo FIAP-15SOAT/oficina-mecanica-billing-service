@@ -202,7 +202,7 @@ As requests ficam em cinco pastas, com testes de status e de envelope (`{ data }
 | Autenticação | O login do funcionário no Identity (`POST /api/auth/login`), que grava o `authToken` usado pelas outras pastas |
 | Documentação | `GET /docs/billing`, o documento OpenAPI do Billing pelo gateway, sem token |
 | Orçamentos | Todas as rotas públicas de orçamento, em sequência: criar com e sem itens, incluir, alterar e remover serviço e peça, detalhar, enviar, rejeitar com e sem motivo, listar paginado, filtrar por OS e por status, listar os orçamentos da OS e aprovar; depois os conflitos com o orçamento aprovado (409), os recursos inexistentes (404), a validação (400) e a falta de token (401) |
-| Cobranças | Todas as rotas públicas de cobrança, em sequência: as recusas da criação (valor acima do saldo e zero, 422; três casas decimais, 400), criar a cobrança, a segunda cobrança com a OS aguardando o pagamento (409), detalhar, listar paginado, filtrar por OS e status, filtro inválido (400), cancelar e cancelar de novo (409); depois a cobrança inexistente (404) e a falta de token (401) |
+| Cobranças | Todas as rotas públicas de cobrança, em sequência: as recusas da criação (valor acima do saldo e zero, 422; três casas decimais, 400), criar a cobrança, a segunda cobrança com a primeira pendente (409), detalhar, listar paginado, filtrar por OS e status, filtro inválido (400), cancelar e cancelar de novo (409); depois a cobrança inexistente (404) e a falta de token (401) |
 
 No gateway, `/api/health/*` e `/api/docs*` são do Work Order: por isso a saúde e o documento do Billing ficam em `/health/billing` e `/docs/billing`. As rotas `/internal/...` não passam pelo gateway e não estão na collection: os testes E2E e as fixtures de contrato as cobrem.
 
@@ -210,9 +210,9 @@ A collection manda `Authorization: Bearer {{authToken}}`, e só o login, os caso
 
 | Variável | Valor | O que precisa existir |
 | --- | --- | --- |
-| `baseUrl` | A URL do API Gateway, que muda a cada subida do ambiente | Só a origem, sem `/api`; o [manual de demonstração](https://github.com/FIAP-15SOAT/oficina-mecanica-work-order-service/blob/main/docs/demo-manual.md#url-pública-e-variáveis) mostra como lê-la |
+| `baseUrl` | A URL do API Gateway, que muda a cada subida do ambiente (localmente, `http://localhost:3002`) | Só a origem, sem `/api`; o [manual de demonstração](https://github.com/FIAP-15SOAT/oficina-mecanica-work-order-service/blob/main/docs/demo-manual.md#url-pública-e-variáveis) mostra como lê-la |
 | `adminEmail`, `adminPassword` | Um `ADMIN` do seed do Identity | O seed do Identity |
-| `authToken` | vazio (secreto) | Gravado pela pasta Autenticação |
+| `authToken` | vazio (secreto) | Gravado pela pasta Autenticação; localmente, um token `ADMIN` assinado com o par cuja chave pública está no `.env` |
 | `workOrderId` | vazio | Uma OS em `AWAITING_APPROVAL`, sem orçamento `APPROVED` |
 | `paymentWorkOrderId` | vazio | Uma OS em `APPROVED`, com orçamento `APPROVED` de pelo menos 100,00 e sem cobrança `PENDING` |
 | `serviceId`, `partSupplyId` | Ids canônicos do seed do Inventory (`Troca de óleo` e `FILT-OL-001`) | O seed do Inventory |
@@ -221,13 +221,24 @@ As duas OS vêm do Work Order. Para preparar a de `workOrderId`, abra uma OS com
 
 A pasta **Orçamentos** guarda os ids que cria nas variáveis da collection `quoteId` e `quoteIdForReject`, então roda na ordem. Ela termina com um orçamento `APPROVED` na OS, e o Work Order leva essa OS a `APPROVED` pela Saga de aprovação: cada execução precisa de outra `workOrderId`.
 
-A pasta **Cobranças** guarda o id da cobrança criada na variável `paymentId` e também roda na ordem. Ela cria uma cobrança de 100,00 no sandbox do Mercado Pago, e o Work Order segura a OS em `AWAITING_PAYMENT`; a segunda cobrança espera essa mudança e recebe 409 da regra de status. No fim, a pasta cancela a cobrança, a OS volta a `APPROVED` e serve para outra execução.
+A pasta **Cobranças** guarda o id da cobrança criada na variável `paymentId` e também roda na ordem. Ela cria uma cobrança de 100,00 no sandbox do Mercado Pago, e a segunda cobrança recebe 409: pela cobrança pendente ou, quando o Work Order já segurou a OS em `AWAITING_PAYMENT`, pela regra de status. No fim, a pasta cancela a cobrança, a OS volta a `APPROVED` e serve para outra execução.
 
 A partir da raiz do repositório, com o ambiente no ar:
 
 ```bash
 # Rodar a collection contra o API Gateway, com as OS da execução
 npx --yes newman run collections/billing-collection.json -e collections/billing-environment.json --env-var baseUrl=<URL do API Gateway> --env-var workOrderId=<id da OS> --env-var paymentWorkOrderId=<id da OS aprovada>
+```
+
+### Execução local
+
+A collection também roda contra o stack local do Billing (Quick Start do README), com o Work Order em `http://localhost:3000` e o Inventory em `http://localhost:3003`. Localmente não há gateway: a saúde e o documento OpenAPI ficam em `/api/health/*` e `/api/docs-json`, e o login é do Identity, em outra porta. Por isso a execução local roda só as pastas **Orçamentos** e **Cobranças**, com a `baseUrl` do Billing e um token de funcionário `ADMIN` assinado com o par cuja chave pública está no `.env` ([Como executar localmente](local-setup.md)). Cada stack local tem o próprio LocalStack, então o Work Order não consome as mensagens do Billing e a OS não muda de status durante a execução.
+
+O stack precisa chegar a um Mercado Pago: com as credenciais de teste no `app/.env`, a cobrança é criada no sandbox; sem elas, use o override do DAST, cujo stub do Mercado Pago responde a criação e o cancelamento ([Como executar localmente › Mercado Pago](local-setup.md#mercado-pago)).
+
+```bash
+# Rodar as pastas de orçamento e cobrança contra a API local, com o token e as OS da execução
+npx --yes newman run collections/billing-collection.json -e collections/billing-environment.json --folder "Orçamentos" --folder "Cobranças" --env-var baseUrl=http://localhost:3002 --env-var authToken=<token ADMIN> --env-var workOrderId=<id da OS> --env-var paymentWorkOrderId=<id da OS aprovada>
 ```
 
 ## Mensagem de teste no ambiente

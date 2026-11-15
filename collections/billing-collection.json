@@ -1593,37 +1593,16 @@
           "response": []
         },
         {
-          "name": "Criar segunda cobrança com a OS aguardando o pagamento (409)",
+          "name": "Criar segunda cobrança com a primeira pendente (409)",
           "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "// The work order holds the payment order in AWAITING_PAYMENT once it consumes billing.payment.requested.",
-                  "function waitForAwaitingPayment(attempt) {",
-                  "    pm.sendRequest({",
-                  "        url: pm.environment.get('baseUrl') + '/api/work-orders/' + pm.environment.get('paymentWorkOrderId'),",
-                  "        method: 'GET',",
-                  "        header: { Authorization: 'Bearer ' + pm.environment.get('authToken') }",
-                  "    }, (err, res) => {",
-                  "        const status = !err && res.code === 200 ? res.json().data.status : null;",
-                  "",
-                  "        if (status !== 'AWAITING_PAYMENT' && attempt < 15) setTimeout(() => waitForAwaitingPayment(attempt + 1), 1000);",
-                  "    });",
-                  "}",
-                  "",
-                  "waitForAwaitingPayment(1);"
-                ]
-              }
-            },
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 409 Conflict', () => pm.response.to.have.status(409));",
-                  "pm.test('Mensagem de erro esperada', () => pm.expect(pm.response.json().message).to.include('APPROVED ou COMPLETED'));"
+                  "// Integrated, the work order may already hold the first payment in AWAITING_PAYMENT, which is checked first.",
+                  "pm.test('Mensagem de erro esperada', () => pm.expect(pm.response.json().message).to.match(/cobrança pendente|APPROVED ou COMPLETED/));"
                 ]
               }
             }
