@@ -4,7 +4,19 @@
   "values": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:3002",
+      "value": "https://<api-id>.execute-api.us-east-1.amazonaws.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "adminPassword",
+      "value": "Tech@2026",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "adminEmail",
+      "value": "guilhermedarochasalvador@gmail.com",
       "type": "default",
       "enabled": true
     },

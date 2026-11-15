@@ -192,36 +192,42 @@ Nenhuma suíte define `OTEL_EXPORTER_OTLP_ENDPOINT`, então o SDK não inicia em
 
 ## Postman / Newman
 
-A collection e o environment estão em `collections/`. Importe `collections/billing-collection.json` e `collections/billing-environment.json` no Postman e selecione o environment **Billing API**.
+A collection e o environment estão em `collections/`. Importe `collections/billing-collection.json` e `collections/billing-environment.json` no Postman e selecione o environment **Billing API**. A collection roda contra o API Gateway, a porta pública da solução, que encaminha cada prefixo de rota ao serviço dono: o login vai ao Identity, e as rotas de orçamento e de cobrança, ao Billing.
 
-As requests ficam em quatro pastas, com testes de status e de envelope (`{ data }`, `{ data, pagination }` ou o corpo de erro):
+As requests ficam em cinco pastas, com testes de status e de envelope (`{ data }`, `{ data, pagination }` ou o corpo de erro):
 
 | Pasta | Requests |
 | --- | --- |
-| Health | `GET /api/health/live` e `GET /api/health/ready`, sem token |
-| Documentação | `GET /api/docs-json`, sem token |
+| Health | `GET /health/billing`, a prontidão do Billing pelo gateway, sem token |
+| Autenticação | O login do funcionário no Identity (`POST /api/auth/login`), que grava o `authToken` usado pelas outras pastas |
+| Documentação | `GET /docs/billing`, o documento OpenAPI do Billing pelo gateway, sem token |
 | Orçamentos | Todas as rotas públicas de orçamento, em sequência: criar com e sem itens, incluir, alterar e remover serviço e peça, detalhar, enviar, rejeitar com e sem motivo, listar paginado, filtrar por OS e por status, listar os orçamentos da OS e aprovar; depois os conflitos com o orçamento aprovado (409), os recursos inexistentes (404), a validação (400) e a falta de token (401) |
-| Cobranças | Todas as rotas públicas de cobrança, em sequência: as recusas da criação (valor acima do saldo e zero, 422; três casas decimais, 400; OS fora de `APPROVED` ou `COMPLETED`, 409), criar a cobrança, a segunda cobrança pendente (409), detalhar, listar paginado, filtrar por OS e status, filtro inválido (400), cancelar e cancelar de novo (409); depois a cobrança inexistente (404) e a falta de token (401) |
+| Cobranças | Todas as rotas públicas de cobrança, em sequência: as recusas da criação (valor acima do saldo e zero, 422; três casas decimais, 400), criar a cobrança, a segunda cobrança com a OS aguardando o pagamento (409), detalhar, listar paginado, filtrar por OS e status, filtro inválido (400), cancelar e cancelar de novo (409); depois a cobrança inexistente (404) e a falta de token (401) |
 
-A collection manda `Authorization: Bearer {{authToken}}`, e só os casos 401, as rotas de saúde e o Swagger dispensam o token. O environment traz a `baseUrl` única e os ids de exemplo:
+No gateway, `/api/health/*` e `/api/docs*` são do Work Order: por isso a saúde e o documento do Billing ficam em `/health/billing` e `/docs/billing`. As rotas `/internal/...` não passam pelo gateway e não estão na collection: os testes E2E e as fixtures de contrato as cobrem.
+
+A collection manda `Authorization: Bearer {{authToken}}`, e só o login, os casos 401, a saúde e o documento OpenAPI dispensam o token. O environment traz:
 
 | Variável | Valor | O que precisa existir |
 | --- | --- | --- |
-| `baseUrl` | `http://localhost:3002` | O Billing; só a origem, sem `/api`. Com o API Gateway implantado, troque só o `baseUrl` pela URL do gateway |
-| `authToken` | vazio (secreto) | Um token de funcionário `ADMIN` assinado com o par cuja chave pública está no `.env` |
-| `workOrderId` | vazio | Uma OS do Work Order local em `AWAITING_APPROVAL`, sem orçamento `APPROVED` no Billing |
-| `paymentWorkOrderId` | vazio | Uma OS do Work Order local em `APPROVED`, com orçamento `APPROVED` de pelo menos 100,00 no Billing e sem cobrança `PENDING` |
-| `serviceId`, `partSupplyId` | Ids canônicos do seed do Inventory (`Troca de óleo` e `FILT-OL-001`) | O Inventory local com o seed |
+| `baseUrl` | A URL do API Gateway, que muda a cada subida do ambiente | Só a origem, sem `/api`; o [manual de demonstração](https://github.com/FIAP-15SOAT/oficina-mecanica-work-order-service/blob/main/docs/demo-manual.md#url-pública-e-variáveis) mostra como lê-la |
+| `adminEmail`, `adminPassword` | Um `ADMIN` do seed do Identity | O seed do Identity |
+| `authToken` | vazio (secreto) | Gravado pela pasta Autenticação |
+| `workOrderId` | vazio | Uma OS em `AWAITING_APPROVAL`, sem orçamento `APPROVED` |
+| `paymentWorkOrderId` | vazio | Uma OS em `APPROVED`, com orçamento `APPROVED` de pelo menos 100,00 e sem cobrança `PENDING` |
+| `serviceId`, `partSupplyId` | Ids canônicos do seed do Inventory (`Troca de óleo` e `FILT-OL-001`) | O seed do Inventory |
 
-A pasta **Orçamentos** guarda os ids que cria nas variáveis da collection `quoteId` e `quoteIdForReject`, então roda na ordem. Ela termina com um orçamento `APPROVED` na OS, e a criação passa a responder 409 para essa OS: cada execução precisa de outra `workOrderId`. O Billing não muda o status da OS, então a mesma OS serve do começo ao fim.
+As duas OS vêm do Work Order. Para preparar a de `workOrderId`, abra uma OS com um serviço, passe-a a `IN_DIAGNOSIS` e envie o orçamento inicial dela; para a de `paymentWorkOrderId`, faça o mesmo e aprove o orçamento (`PATCH /api/quotes/{id}` com `"status": "APPROVED"`) até a OS chegar a `APPROVED`. Os passos estão no [manual de demonstração](https://github.com/FIAP-15SOAT/oficina-mecanica-work-order-service/blob/main/docs/demo-manual.md).
 
-A pasta **Cobranças** guarda o id da cobrança criada na variável `paymentId` e também roda na ordem. Ela cria uma cobrança de 100,00 e a cancela no fim, então a OS de `paymentWorkOrderId` termina sem cobrança pendente e serve para outra execução. O stack precisa chegar a um Mercado Pago: com as credenciais de teste no `app/.env`, a cobrança é criada no sandbox; sem elas, use o override do DAST, cujo stub do Mercado Pago responde a criação e o cancelamento ([Como executar localmente › Mercado Pago](local-setup.md#mercado-pago)).
+A pasta **Orçamentos** guarda os ids que cria nas variáveis da collection `quoteId` e `quoteIdForReject`, então roda na ordem. Ela termina com um orçamento `APPROVED` na OS, e o Work Order leva essa OS a `APPROVED` pela Saga de aprovação: cada execução precisa de outra `workOrderId`.
 
-Com o stack local do Billing no ar (Quick Start do README), o Work Order em `http://localhost:3000` e o Inventory em `http://localhost:3003`, a partir da raiz do repositório:
+A pasta **Cobranças** guarda o id da cobrança criada na variável `paymentId` e também roda na ordem. Ela cria uma cobrança de 100,00 no sandbox do Mercado Pago, e o Work Order segura a OS em `AWAITING_PAYMENT`; a segunda cobrança espera essa mudança e recebe 409 da regra de status. No fim, a pasta cancela a cobrança, a OS volta a `APPROVED` e serve para outra execução.
+
+A partir da raiz do repositório, com o ambiente no ar:
 
 ```bash
-# Rodar a collection contra a API local, com o token e as OS da execução
-npx --yes newman run collections/billing-collection.json -e collections/billing-environment.json --env-var authToken=<token ADMIN> --env-var workOrderId=<id da OS> --env-var paymentWorkOrderId=<id da OS aprovada>
+# Rodar a collection contra o API Gateway, com as OS da execução
+npx --yes newman run collections/billing-collection.json -e collections/billing-environment.json --env-var baseUrl=<URL do API Gateway> --env-var workOrderId=<id da OS> --env-var paymentWorkOrderId=<id da OS aprovada>
 ```
 
 ## Mensagem de teste no ambiente
