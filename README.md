@@ -207,7 +207,7 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 │   ├── docker-compose.yml       # Stack local
 │   ├── docker-compose.dast.yml  # Override do DAST, com os stubs dos outros serviços e do Mercado Pago
 │   └── package.json             # Dependências e comandos npm
-├── collections/                 # Collection e environment do Postman
+├── collections/                 # Collection e environments (local e gateway) do Postman
 ├── docs/
 │   ├── adr/                     # Decisões arquiteturais
 │   ├── c4/                      # Diagrama C4 de componentes

@@ -1,10 +1,28 @@
 {
   "id": "27d0e00c-85a0-508a-bda4-39e61c77a93d",
-  "name": "Billing API",
+  "name": "Billing API · Local",
   "values": [
     {
       "key": "baseUrl",
-      "value": "https://<api-id>.execute-api.us-east-1.amazonaws.com",
+      "value": "http://localhost:3002",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "identityBaseUrl",
+      "value": "http://localhost:3001",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "healthPath",
+      "value": "api/health/ready",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "openApiPath",
+      "value": "api/docs-json",
       "type": "default",
       "enabled": true
     },

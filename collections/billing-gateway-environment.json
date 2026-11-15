@@ -1,0 +1,73 @@
+{
+  "id": "27d0e00c-85a0-508a-bda4-39e61c77a93d-gateway",
+  "name": "Billing API · Gateway",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "identityBaseUrl",
+      "value": "{{baseUrl}}",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "healthPath",
+      "value": "health/billing",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "openApiPath",
+      "value": "docs/billing",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "adminPassword",
+      "value": "Tech@2026",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "adminEmail",
+      "value": "guilhermedarochasalvador@gmail.com",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "secret",
+      "enabled": true
+    },
+    {
+      "key": "workOrderId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "paymentWorkOrderId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "serviceId",
+      "value": "3551b3f8-625e-4f2b-b777-a1d0ec4e4585",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "partSupplyId",
+      "value": "361b050f-c441-429d-8a73-dfc12415dc62",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

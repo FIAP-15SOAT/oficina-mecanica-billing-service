@@ -23,13 +23,12 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/health/billing",
+              "raw": "{{baseUrl}}/{{healthPath}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "health",
-                "billing"
+                "{{healthPath}}"
               ]
             },
             "auth": {
@@ -49,13 +48,13 @@
               }
             }
           ],
-          "name": "Prontidão do billing pelo API Gateway"
+          "name": "Prontidão do billing"
         }
       ]
     },
     {
       "name": "Autenticação",
-      "description": "O login do funcionário é do Identity, pelo mesmo API Gateway; grava o authToken que as outras pastas usam.",
+      "description": "O login do funcionário é do Identity, em identityBaseUrl; grava o authToken que as outras pastas usam.",
       "item": [
         {
           "request": {
@@ -67,9 +66,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/auth/login",
+              "raw": "{{identityBaseUrl}}/api/auth/login",
               "host": [
-                "{{baseUrl}}"
+                "{{identityBaseUrl}}"
               ],
               "path": [
                 "api",
@@ -115,13 +114,12 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/docs/billing",
+              "raw": "{{baseUrl}}/{{openApiPath}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "docs",
-                "billing"
+                "{{openApiPath}}"
               ]
             },
             "auth": {
@@ -141,7 +139,7 @@
               }
             }
           ],
-          "name": "Documento OpenAPI pelo API Gateway"
+          "name": "Documento OpenAPI"
         }
       ]
     },
