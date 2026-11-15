@@ -2,6 +2,12 @@
 
 PostgreSQL 18, só deste serviço, definido em [`app/prisma/schema.prisma`](../app/prisma/schema.prisma) e versionado em [`app/prisma/migrations/`](../app/prisma/migrations/). O serviço não tem seed: as migrations só criam o schema.
 
+## Diagrama entidade-relacionamento
+
+<p align="center"><img src="diagrams/database-er.png" alt="Diagrama entidade-relacionamento dos 5 modelos do schema Prisma: Quote (tabela quotes) e seus itens QuoteService (tabela quote_services) e QuotePartSupply (tabela quote_part_supplies), Payment (tabela payments) e OutboxMessage (tabela outbox); com tipos reais do Postgres, chaves primárias, estrangeiras e únicas, o único parcial de payments.work_order_id entre as cobranças PENDING e as relações de um orçamento com zero ou mais itens de cada tipo; work_order_id, service_id, part_supply_id e decided_by guardam ids de outros serviços, sem chave estrangeira" width="100%"></p>
+
+As colunas `work_order_id`, `service_id`, `part_supply_id` e `decided_by` guardam ids do Work Order, do Inventory e do Identity, os serviços da solução donos das ordens de serviço, do catálogo e dos usuários, sem chave estrangeira. `replaced_by_quote_id` aponta para outro orçamento da mesma tabela, também sem chave estrangeira.
+
 ## Tabelas
 
 | Tabela | Conteúdo | Chaves e índices |

@@ -9,7 +9,8 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)
 ![Prisma](https://img.shields.io/badge/Prisma-7.10-2D3748?logo=prisma&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
-![Cobertura unitária](https://img.shields.io/badge/cobertura-100%25-brightgreen)
+[![Cobertura](https://sonarcloud.io/api/project_badges/measure?project=FIAP-15SOAT_oficina-mecanica-billing-service&metric=coverage)](https://sonarcloud.io/summary/new_code?id=FIAP-15SOAT_oficina-mecanica-billing-service)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=FIAP-15SOAT_oficina-mecanica-billing-service&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=FIAP-15SOAT_oficina-mecanica-billing-service)
 
 </div>
 
@@ -226,6 +227,7 @@ Clean Architecture com quatro camadas e dependências apontando só para dentro.
 | 🗄️ [Banco de dados](docs/database.md) | Tabelas, índices, colunas de decisão e de restauração, cobranças, concorrência e cache |
 | 💻 [Como executar localmente](docs/local-setup.md) | Setup local, portas por contexto, chave do token, Mercado Pago e variáveis de ambiente |
 | 🧪 [Testes](docs/testing.md) | Unitários, E2E, stubs do Work Order, do Inventory e do Mercado Pago, contratos, badge de cobertura e Postman/Newman |
+| 🎬 [Manual de demonstração da solução](https://github.com/FIAP-15SOAT/oficina-mecanica-work-order-service/blob/main/docs/demo-manual.md) | Preparo do ambiente, fluxo completo da ordem de serviço, da abertura à entrega, pagamento no sandbox do Mercado Pago e falhas com compensação provocadas de fora, no work-order |
 | 🛠️ [Runbook do Mercado Pago](docs/runbook.md) | Contas de teste, URL do webhook no painel, troca da chave, cartões de teste e cobrança presa |
 | 🧩 [Modelo C4](docs/c4/README.md) | Diagrama de componentes da API, com a descrição de cada componente |
 | 🔄 [CI/CD](docs/ci-cd.md) | Workflows de CI, CD, SAST e DAST, secrets e variables, inclusive os do Mercado Pago |
