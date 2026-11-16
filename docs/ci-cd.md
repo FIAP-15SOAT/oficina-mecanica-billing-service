@@ -67,6 +67,8 @@ As credenciais do Mercado Pago seguem outro caminho, porque não existem na AWS:
 
 Roda os testes unitários com cobertura e envia o `coverage/lcov.info` ao SonarQube Cloud (`sonarqube-scan-action` v8.3.0), projeto `FIAP-15SOAT_oficina-mecanica-billing-service` da organização `fiap-15soat`. O `sonar.qualitygate.wait=true` de `app/sonar-project.properties` faz o job falhar quando o quality gate falha. O resultado fica no [painel do projeto](https://sonarcloud.io/project/overview?id=FIAP-15SOAT_oficina-mecanica-billing-service).
 
+O SAST tem workflow próprio, disparado pelo Pull Request para a `main` e pelo `push` na `main`, porque o [plano gratuito do SonarQube Cloud](https://docs.sonarsource.com/sonarqube-cloud/administering-sonarcloud/managing-subscription/subscription-plans) analisa só a branch principal e os Pull Requests para ela, nunca as branches de trabalho (`feature/**` e `fix/**`) em que o CI roda. No Pull Request, a análise aponta só os problemas que o PR introduz em relação à `main`; no `push` na `main`, atualiza a análise da branch principal, que é a referência dessa comparação.
+
 ## 4) Workflow de DAST (`dast.yml`)
 
 ![Diagrama do workflow de DAST: par RS256 efêmero, stack do compose, OpenAPI pela porta publicada, token de ADMIN assinado no job, scan do ZAP e relatório como artifact](diagrams/dast-workflow.png)
